@@ -24,15 +24,14 @@ frontend/
     layout.tsx                      # fonts, providers, AppShell
     page.tsx                        # / Home feed
     explore/page.tsx
-    create/page.tsx                 # new post: idea or project, plus checks
+    create/page.tsx                 # new post: idea or project; checks for ideas
     projects/[id]/page.tsx          # project page (Code, Needs, Discussion, Activity)
-    projects/[id]/results/page.tsx  # checks and People graph
-    projects/[id]/team/page.tsx     # team shares and sell
+    projects/[id]/results/page.tsx  # ideas: checks and People graph; projects: People only
+    projects/[id]/team/page.tsx     # team and shares
     inbox/page.tsx
     u/[handle]/page.tsx             # profile (own profile is /u/me)
+    onboarding/page.tsx             # skills, interests, people to follow
     login/page.tsx
-    mock-checkout/[id]/page.tsx
-    mock-checkout/unlock/[projectId]/page.tsx
     auth/callback/route.ts
   components/
     ui/                             # shadcn generated
@@ -59,9 +58,8 @@ frontend/
       CommentThread.tsx
       SourceBrowser.tsx
       SourceUpload.tsx
-      SourceBadge.tsx               # Open source, or Closed with price
+      SourceBadge.tsx               # Open source only
       StageBadge.tsx                # Idea, Building, Shipped
-      UnlockButton.tsx
     checks/
       ChecksToggle.tsx              # two switches: Market check, Cool factor
       CheckTabs.tsx                 # Market check and Cool factor tabs (and People on mobile)
@@ -76,11 +74,10 @@ frontend/
       RingInviteCard.tsx            # who does what for whom, Accept ring, Decline
     team/
       TeamList.tsx
-      ShareBar.tsx                  # segmented revenue bar and total
-      SellPanel.tsx                 # price, Open or Closed, List for sale, test sales
-      MockCheckout.tsx
-      BountyInput.tsx
-      ContributionCard.tsx
+      ShareBar.tsx                  # segmented Tolken-share bar and total
+      BountyInput.tsx               # Tolken bounty per need
+    onboarding/
+      OnboardingWizard.tsx          # skills, interests, people to follow
     profile/
       ProfileHeader.tsx
       SkillChips.tsx
@@ -124,26 +121,25 @@ NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 
 | Route | Shows | Key components |
 | --- | --- | --- |
-| `/` | Stories row, For you, Following, and Ideas tabs, PostCards; desktop right column of swaps ready and needed-most tags | StoryRow, FeedTabs, PostCard, SideSuggestions |
-| `/explore` | Search, filter chips (All, Ideas, Software, Hardware, Creative, Open source, For sale), tile grid | ExploreGrid |
-| `/create` | New post: cover preview, title, caption, Looking for, You bring, checks switches, submit | PostForm, SkillPicker, ChecksToggle |
-| `/projects/[id]` | Header with Star, Follow, Offer to help; tabs Code, Needs, Discussion, Activity; file table, README, About panel | ProjectHeader, ProjectTabs, FileTable, Readme, AboutPanel, LanguageBar, NeedList, CommentThread, SourceBrowser, UnlockButton |
-| `/projects/[id]/results` | Chosen checks beside the People graph and the selected person's detail; mobile uses People, Market, and Cool factor tabs | CheckTabs, ResearchReport, CoolFactorCard, PeopleGraph, PersonDetail |
-| `/projects/[id]/team` | Team and shares, still-open needs, Sell it panel with test sales | TeamList, ShareBar, SellPanel |
+| `/` | Stories row, For you, Following, and Ideas tabs, PostCards; onboarding nudge until the profile is set up; desktop right column of swaps ready and needed-most tags | StoryRow, FeedTabs, PostCard, SideSuggestions, OnboardingPrompt |
+| `/explore` | Search, filter chips (All, Needs you, Ideas, Software, Hardware, Creative, Open source), tile grid | ExploreGrid |
+| `/create` | New post: cover preview, title, caption, Looking for, You bring, checks switches (ideas only), submit | PostForm, SkillPicker, ChecksToggle |
+| `/projects/[id]` | Header with Star, Follow, Offer to help; tabs Code, Needs, Discussion, Activity; file table, README, About panel | ProjectHeader, ProjectTabs, FileTable, Readme, AboutPanel, LanguageBar, NeedList, CommentThread, SourceBrowser |
+| `/projects/[id]/results` | Ideas: Market and Cool factor checks beside the People graph. Projects: People who fit only | CheckTabs, ResearchReport, CoolFactorCard, PeopleGraph, PersonDetail |
+| `/projects/[id]/team` | Team and shares for Tolken bounties, still-open needs | TeamList, ShareBar |
 | `/inbox` | Requests and Messages; ring, swap, and join requests with Accept or Decline | RingInviteCard, RequestRow |
-| `/u/[handle]` | Profile: stats, I offer, swaps and rings, contribution graph, Projects, Ideas, Starred, Earnings | ProfileHeader, SkillChips, CycleCard, ContributionGraph, ProfileGrid, ContributionCard |
-| `/mock-checkout/[id]` | Fake checkout for a bounty (owner only) | MockCheckout |
-| `/mock-checkout/unlock/[projectId]` | Fake checkout to unlock closed source | MockCheckout |
-| `/login` | GitHub OAuth and email magic link | shadcn Card, Button |
+| `/u/[handle]` | Profile: stats, I offer, interests, swaps and rings, contribution graph, Projects, Ideas, Starred, Tolken | ProfileHeader, SkillChips, CycleCard, ContributionGraph, ProfileGrid |
+| `/onboarding` | Three steps: skills, interests, people to follow; saves the profile matching uses | OnboardingWizard |
+| `/login` | GitHub OAuth, email magic link, or browse first; auth lands on `/onboarding` | shadcn Card, Button |
 
 Protect `/create`, `/inbox`, `/u/me`, and `/projects/[id]/team` with a server-side session check that redirects to `/login`. Older routes (`/requests`, `/ideas`, `/for-you`, `/projects/new`, `/ideas/new`, `/me`) are replaced: Ideas and For you are tabs on `/`, requests live in `/inbox`, and creation is `/create`.
 
 ## Data access rules
 
-- Via the FastAPI (`lib/api.ts`, JWT in `Authorization`): projects list/detail/create, matches, feed, collab requests, unlock, source upload and viewing, offers. Send the token when logged in, but allow source browsing without one for open projects.
+- Via the FastAPI (`lib/api.ts`, JWT in `Authorization`): projects list/detail/create, matches, feed, collab requests, source upload and viewing, offers. Send the token when logged in, but allow source browsing without one for open projects.
 - Direct to Supabase: login, comments (read and insert), image upload to Storage, profile edits.
 - Never expose the service key. Only the anon key is in the browser.
-- Payments are mocked: no money moves, and every payment action is a FastAPI call.
+- There is no money and no checkout. Tolken is the in-app currency, stored as an integer balance; bounties move Tolken between accounts.
 
 ## Screens in detail (social app)
 
@@ -156,25 +152,32 @@ Every screen below has a desktop and a mobile version built from the same compon
 - **Desktop right column:** the user's mini profile, "Swaps ready for you" (three people with an **Invite** link), and "Needed most" skill chips.
 
 ### Explore (`/explore`)
-- Search box and filter chips (toggle buttons with `aria-pressed`). Tiles are square `CoverArt` with a caption (title, type and source line). An Idea pill or a price pill (`$15`) sits top right. 4 columns on desktop, 2 on mobile.
+- Search box and filter chips (toggle buttons with `aria-pressed`). Tiles are square `CoverArt` with a caption (title, type and source line). An Idea pill sits top right; there is no price pill. 4 columns on desktop, 2 on mobile.
+
+### Onboarding (`/onboarding`)
+- Shown right after login, and reachable from the home nudge until it is finished. No rail or tab bar.
+- Three steps with a progress bar: **skills** (chips from the skill list, at least one), **interests** (tag chips, at least one), **people to follow** (six suggested people with their skills and a Follow toggle).
+- Finish saves skills and interests (the inputs matching reads) and returns to `/`. Skip marks it done with the defaults so the demo is never blocked.
+- Copy makes the payoff explicit: matching finds ideas that need your skills; interests steer recommendations; follows fill the Following tab.
 
 ### Create (`/create`)
-- Left: cover preview (shuffle art or upload). Right: Title, Caption, **Looking for** (SkillPicker chips with remove), **You bring** (chips), then **What should Nodal check?** with two `ChecksToggle` switches (Market check, Cool factor). The submit button text follows the switches: "Post and run both checks", "Post and run market check", "Post and score cool factor", or "Post".
+- Left: cover preview (shuffle art or upload). Right: Title, Caption, **Looking for** (SkillPicker chips with remove), **You bring** (chips), then, for ideas only, **What should Nodal check?** with two `ChecksToggle` switches (Market check, Cool factor). The submit button text follows the switches: "Post and run both checks", "Post and run market check", "Post and score cool factor", or "Post". Posting as a project shows "Post project" and no checks.
 - On submit: `POST /projects` (stage `idea` unless the user chose Project), then `POST /projects/{id}/research` with the selected `checks` if any, then go to `/projects/[id]/results`. With no checks, go to the project page.
 
 ### Project page (`/projects/[id]`)
-- Header: 120px cover, title, badges (Open source or Closed with price, type), owner and "updated" line, buttons **Star** (with count), **Follow**, **Offer to help**.
-- Tabs with count badges: Code, Needs, Discussion, Activity. Code shows a branch pill, latest-change row with **Download zip**, `FileTable` (folders first, mono names, short message, age), then the README in a bordered panel. For a closed project the tree shows locked until unlocked.
+- Header: 120px cover, title, badges (Open source when it has source, type), owner and "updated" line, buttons **Star** (with count), **Follow**, **Offer to help**.
+- Tabs with count badges: Code, Needs, Discussion, Activity. Code shows a branch pill, latest-change row with **Download zip**, `FileTable` (folders first, mono names, short message, age), then the README in a bordered panel. Source is always open to read and download.
 - Right column (desktop): About (summary, tags, stars, collaborators, license), **Looking for** with an **Offer** button per need, `LanguageBar`, collaborator avatars. On mobile these collapse into a stats row, the action buttons, the language bar, and a "Looking for" strip.
+- Owner buttons: **View checks** on an idea, **People who fit** on a project, and **Team**.
 
 ### Checks and people (`/projects/[id]/results`)
 - Header: small cover, title, StageBadge, "Posted just now", **View post** and **Start building**.
-- **CheckTabs** show only the checks that were chosen. Market check: verdict badge, confidence, "Sample report" badge in fixture mode, summary, Competitors, Demand, Risk, Next steps, source chips, AI footer. Cool factor: big score, one line explaining it ignores money, four measure bars (novelty, demo appeal, fun to build with others, weekend-sized scope), and a short "why". Poll `GET /research/{id}` every 2 seconds while a check is running and show steps as in the Research section below.
-- **PeopleGraph** and **PersonDetail** (see Graph view). On mobile the three views are tabs: People (default), Market, Cool factor.
+- **Ideas only.** Market check: verdict badge, confidence, "Sample report" badge in fixture mode, summary, Competitors, Demand, Risk, Next steps, source chips, AI footer. Cool factor: big score, one line explaining it ignores money, four measure bars (novelty, demo appeal, fun to build with others, weekend-sized scope), and a short "why". Poll `GET /research/{id}` every 2 seconds while a check is running and show steps as in the Research section below.
+- **PeopleGraph** and **PersonDetail** (see Graph view). On mobile an idea shows three tabs (People, Market, Cool factor); a project shows the People view only, with no check tabs anywhere.
 
-### Team and sell (`/projects/[id]/team`)
+### Team and shares (`/projects/[id]/team`)
 - **Team and shares:** `ShareBar` (segmented, total shown), then one row per member: avatar, name, role or status (owner, joined, invited), skills, share percent. A pending member shows a dashed avatar and "set a share when she accepts". A "Still open" row suggests inviting the next best person.
-- **Sell it panel:** Price input, Source code choice (Open or Closed, as radio cards), **List for sale** (disabled with an inline reason until shares total 100%), "Test mode" note, and a Test sales summary with each member's cut. On mobile, price and source choice sit on one row.
+- Shares split Tolken bounties. There is no seller, no price, no checkout, and no sales list.
 
 ### Inbox (`/inbox`)
 - Two-pane on desktop (thread list left, selected thread right); a single list on mobile with inline actions. Filter pills: Requests, Messages.
@@ -184,16 +187,16 @@ Every screen below has a desktop and a mobile version built from the same compon
 - Header: 120px avatar (76px mobile), handle, **Edit profile** and **Share profile** on your own, stats (projects, stars, collaborations, followers), bio.
 - **I offer** SkillChips with levels (discipline tint) and an Edit link. **Swaps and rings** card with View links to the Inbox thread.
 - **ContributionGraph:** `GET /profiles/{handle}/activity`; 52 weeks on desktop, 27 on mobile; 5 teal levels; cells 12px desktop, 9px mobile; the container has `role="img"` and an `aria-label`.
-- Tabs Projects, Ideas, Starred, Earnings. Projects and Ideas show a 3-column `ProfileGrid` of tiles. Earnings shows ContributionCards and the total.
+- Tabs Projects, Ideas, Starred, Tolken. Projects and Ideas show a 3-column `ProfileGrid` of tiles. Tolken shows the balance, released total, and bounty history in Tolken.
 
 ### Older screen notes
-The sections below (Project detail, Me, Graph view, CycleCard, Ideas, Research, For you, Source code, Payments) still describe behavior and data. Where they name an old route or layout, use the screens above.
+The sections below (Project detail, Me, Graph view, CycleCard, Ideas, Research, For you, Source code, Tolken) still describe behavior and data. Where they name an old route or layout, use the screens above.
 
 ## Behavior details
 
 ### Project detail (`/projects/[id]`)
 - Header: cover image, title, TypeBadge, owner handle, links (repo, demo).
-- Header shows SourceBadge. Closed projects hide `repo_url` until unlocked; do not render an empty link. The Source tab is described under Source code.
+- Header shows SourceBadge. Source is always open, so `repo_url` is always visible when present. The Source tab is described under Source code.
 - Needs section: NeedBadge list with skill name, note, status.
 - "People for this project": MatchList from `GET /projects/{id}/matches`. Each row: avatar, name, skill matched, score, reason chips, primary button **Request collab** (opens a dialog with a message field).
 - List/Graph toggle (shadcn Tabs) on the matches section. Graph tab renders GraphView from `GET /graph/projects/{id}`. Rows with `reciprocal: true` show a "Swap" badge.
@@ -254,37 +257,30 @@ Shown to the owner on an idea, and to everyone as a read-only report when `is_pu
 
 **SourceUpload** (in ProjectForm and on the owner's project page):
 
-- Radio group: **No source**, **Open source** (anyone can read and download), **Closed source** (people pay to unlock). Closed shows a price field: dollars in the UI, integer cents to the API, minimum $1.
+- Radio group: **No source**, **Open source** (anyone can read and download). There is no closed or paid option.
 - Zip picker with drag and drop; a native file input is fine. Show the limits ("Max 25 MB, 1000 files") and a note that `.git`, `node_modules`, and `.env` files are skipped. Reject non-.zip files client-side.
-- Call order: `PATCH /projects/{id}` with `source_access` and `price_cents`, then `POST /projects/{id}/source`. Show a spinner while uploading, then the result: file count and skipped count ("Skipped 214 files (dependencies and secrets)"). Show API errors (too big, bad paths) as toasts.
-- If the user picks Closed and also entered a public repo link, warn once: "A public repo link lets anyone see your code."
+- Call order: `PATCH /projects/{id}` with `source_access`, then `POST /projects/{id}/source`. Show a spinner while uploading, then the result: file count and skipped count ("Skipped 214 files (dependencies and secrets)"). Show API errors (too big, bad paths) as toasts.
 
 **SourceBrowser** (Source tab on `/projects/[id]`, shown when `has_source` is true):
 
-- Left: a file tree built from `GET /projects/{id}/source/tree` with collapsible folders and lucide `Folder`, `File`, and `Lock` icons. Right: the file viewer.
-- Open, or closed and unlocked: clicking a text file calls `GET .../source/file?path=` and shows it in a `<pre>` with line numbers, as plain escaped text (never `dangerouslySetInnerHTML`). Binary files show "Binary file, download the zip". A **Download .zip** button calls `GET .../source/download` and opens the returned URL.
-- Closed and locked: the tree shows with lock icons and the viewer shows an UnlockCard ("Closed source. Unlock for $X. Demo payment, no money moves.") with a button that calls `POST /projects/{id}/unlock` and navigates to the returned mock checkout URL. Download is disabled. Logged-out visitors go to `/login` first. Owners always have access.
+- Left: a file tree built from `GET /projects/{id}/source/tree` with collapsible folders and lucide `Folder` and `File` icons. Right: the file viewer.
+- Clicking a text file calls `GET .../source/file?path=` and shows it in a `<pre>` with line numbers, as plain escaped text (never `dangerouslySetInnerHTML`). Binary files show "Binary file, download the zip". A **Download .zip** button calls `GET .../source/download` and opens the returned URL.
 - Skeleton while the tree loads. Empty state "No source uploaded", with an **Upload source** button for the owner.
 
-**SourceBadge** (ProjectCard and project header): Open source with lucide `LockOpen`, or Closed with the price and lucide `Lock`. Hidden when there is no source.
+**SourceBadge** (ProjectCard and project header): Open source with lucide `LockOpen`. Hidden when there is no source.
 
-**Unlock checkout** (`/mock-checkout/unlock/[projectId]`): reuses MockCheckout with the project title and price. **Pay $X** calls `POST /projects/{id}/mock-unlock`, then redirects to the project's Source tab with a "Source unlocked" toast.
+### Tolken (in-app currency)
 
-### Payments (mock)
+There is no money in Nodal: no checkout, no prices, no payouts. Tolken (`◈`) is the in-app currency and every amount is a whole number of Tolken.
 
-No money moves. Label every payment screen "Demo payment". All payment actions are FastAPI calls.
-
-- ProjectForm: each need gets an optional **Bounty** field (BountyInput). Show dollars in the UI, send integer cents, minimum $1.
-- NeedBadge shows the bounty amount when one is set.
-- `/requests`: for accepted requests that have a contribution, ContributionCard shows the amount, a status badge (Pending funding, Funded, Released, Refunded, Cancelled), and the actions the viewer may take.
-  - Owner: **Fund** (when pending funding) calls `POST /contributions/{id}/fund` and navigates to the returned `/mock-checkout/{id}` URL; **Release payment** (when funded) opens a confirmation dialog, then calls `/release`; **Cancel** calls `/cancel`.
-  - Contributor: status only.
-- `/mock-checkout/[id]` (MockCheckout): owner only; anyone else redirects to `/requests`. Styled like a hosted checkout: a banner "Demo payment: no money moves", an order summary (bounty name and amount), a read-only card field showing `4242 4242 4242 4242`, and a **Pay $X** button that calls `POST /contributions/{id}/mock-pay`, then redirects to `/requests` with a "Bounty funded" toast. A Cancel link returns to `/requests`.
-- `/me`: show "Earned: $X" from `GET /me/earnings` near the profile header.
-- Show API `detail` messages (for example a 409 on an invalid status change) as toasts.
+- ProjectForm: each need gets an optional **Bounty** field (BountyInput) in Tolken.
+- NeedBadge and NeedRows show the bounty in Tolken when one is set, for example `◈ 40 bounty`.
+- An owner funds a bounty from the project's Needs tab. The balance drops, the bounty is marked **Funded**, and the split follows the team shares. Accepting a collab request on a funded need marks it for release.
+- The profile's Tolken tab shows the balance, the released total, and each bounty's history (Released, Funded). No card field, no test card, no hosted-checkout screen.
+- Show API `detail` messages (for example insufficient balance) as toasts.
 
 ### Create project
-- ProjectForm (zod validation): type, title, summary, cover upload, repo/demo links, source (SourceUpload: none, open, or closed with a price), tags, needs (SkillPicker plus note per need). In idea mode (`mode="idea"`) the form hides source and repo/demo links, adds a README field, and sends `stage: "idea"`.
+- ProjectForm (zod validation): type, title, summary, cover upload, repo/demo links, source (SourceUpload: none or open), tags, needs (SkillPicker plus note per need, optional Tolken bounty). In idea mode (`mode="idea"`) the form hides source and repo/demo links, adds a README field, shows the check switches, and sends `stage: "idea"`.
 
 ### Home
 - Intersections feed from `GET /feed/intersections`: card pairs showing two projects of different types and the shared tags.
@@ -301,18 +297,18 @@ No money moves. Label every payment screen "Demo payment". All payment actions a
 
 ## Definition of done
 
-1. Log in with GitHub or magic link.
+1. Log in with GitHub or magic link, then finish onboarding: pick skills, interests, and people to follow.
 2. The Home feed shows the stories row and PostCards; the For you, Following, and Ideas tabs change the list.
-3. Create an idea with a need and the two check switches; the submit text follows the switches; submitting opens the results page.
-4. Results page: the chosen checks show in tabs (steps stream while running; sample badge in fixture mode), and the People graph shows the seeded swap and ring in teal; selecting a person updates PersonDetail.
+3. Create an idea with a need and the two check switches; the submit text follows the switches; submitting opens the results page. Posting as a project shows no checks and opens the project page.
+4. Results page: the chosen checks show in tabs (steps stream while running; sample badge in fixture mode), and the People graph shows the seeded swap and ring in teal; selecting a person updates PersonDetail. A project's results page shows people only.
 5. Send a collab request or ring invite; the other user sees and responds in `/inbox`.
 6. A project page shows the file table, README, About, and Offer to help; star and follow toggle optimistically.
-7. Team page: shares total shows live; List for sale is blocked until 100%; a mock unlock shows the split in Test sales.
-8. Source: an owner uploads a zip as open source and a logged-out visitor can browse and download it. A closed project shows its tree locked until the mock unlock, then opens.
-9. Bounties: an owner adds a bounty, funds it through the mock checkout, and releases it; the contributor sees it as Released and Earnings go up.
-10. Profile shows stats, I offer, Swaps and rings, the contribution graph, and the project grid.
+7. Team page: shares total shows live; shares are labelled as splitting Tolken bounties, with no sell or checkout panel anywhere.
+8. Source: an owner uploads a zip as open source and a logged-out visitor can browse and download it.
+9. Bounties: an owner funds a bounty in Tolken from the Needs tab; the balance drops and the need reads Funded. No payment screen exists.
+10. Profile shows stats, I offer, interests, Swaps and rings, the contribution graph, the project grid, and the Tolken tab.
 11. Explore filters work and the grid reflows from 4 columns to 2.
-12. Every screen holds at 390px width with the tab bar visible, and at 1280px with the rail.
+12. Every screen holds at 390px width with the tab bar visible, and at 1280px with the rail; onboarding and login are full-screen.
 
 ## Build order
 
@@ -326,7 +322,8 @@ No money moves. Label every payment screen "Demo payment". All payment actions a
 8. `PeopleGraph`, `PersonDetail`, `MatchList`, `CycleCard`; ship CycleCard first if behind
 9. Results page: `CheckTabs`, `ResearchReport`, `CoolFactorCard`, polling
 10. Inbox: `RingInviteCard`, `RequestRow`, accept and decline
-11. Team page: `TeamList`, `ShareBar`, `SellPanel`, `MockCheckout`, `UnlockButton`, source upload and browser
-12. Profile: `ProfileHeader`, `SkillChips`, `ContributionGraph`, `ProfileGrid`, Earnings
-13. Stars, follows, recommendations (For you ranking), idea suggestions
-14. Polish and a mobile pass at 390px
+11. Team page: `TeamList`, `ShareBar`, source upload and browser
+12. Profile: `ProfileHeader`, `SkillChips`, `ContributionGraph`, `ProfileGrid`, Tolken balance
+13. Onboarding wizard: skills, interests, follows; wire it after login and from the home nudge
+14. Stars, follows, recommendations (For you ranking), idea suggestions
+15. Polish and a mobile pass at 390px

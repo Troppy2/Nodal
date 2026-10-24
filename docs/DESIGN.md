@@ -17,16 +17,17 @@ Nodal is a GitHub-style home for software, hardware, and creative projects, wher
 - See ranked matches both ways: "who can help my project" and "which projects need me"
 - See reciprocal swaps and 3-way rings around a project, drawn as a node graph
 - Discuss on a project via comments
-- Pay contributors for work on a need (mock payments)
-- Upload a project's source code as a zip, either open (anyone can read it) or closed (pay to unlock)
+- Earn and fund bounties in Tolken, the in-app currency
+- Upload a project's source code as a zip; source is open (anyone can read it)
 - Post an idea that others join and build with you
 - Run an AI market-research agent on an idea and get a cited report on whether it looks viable as a company
 - Get recommended ideas and projects to work on
+- Onboard in three steps (skills, interests, people to follow) so matching works from day one
 - Demo end to end in under 3 minutes
 
 **Non-goals (roadmap slide only)**
 
-- Real payments (Stripe or otherwise); payments are mocked
+- Any form of real money, checkout, or payouts. Tolken is in-app only
 - Guaranteed-accurate market verdicts; the research report is a cited starting point
 - Embedding-based matching
 - Notifications, DMs, moderation tooling, search beyond basic filters
@@ -39,7 +40,7 @@ Nodal is a GitHub-style home for software, hardware, and creative projects, wher
 | Social app shell | Must | Feed, stories row, Explore grid, Inbox, Profile; identical screens on desktop and mobile. See Product shape |
 | Stars and follows | Should | Star a project, follow a person; feeds the Following tab and the profile stats |
 | Profile contribution graph | Could | GitHub-style heatmap of posts, comments, collabs, and uploads |
-| Team shares and sell | Should | Members hold revenue shares; a closed project is listed for sale and test sales split by share |
+| Team shares | Should | Joined members hold shares of Tolken bounties; the bar shows the split and must total 100% |
 | Create project (software, hardware, creative) | Must | Title, summary, cover image, links, tags |
 | Needs and offers | Must | Fixed skill taxonomy plus free tags |
 | Match view | Must | Centerpiece |
@@ -47,26 +48,28 @@ Nodal is a GitHub-style home for software, hardware, and creative projects, wher
 | Node graph view | Should | Project at center, fillers around it, rings highlighted |
 | Comments | Must | Flat, no threading |
 | Collab request | Should | One table, no real-time |
-| Contributor payments (mock) | Should | Bounty on a need; owner funds through a fake checkout, then releases to the contributor; no real money |
+| Tolken bounties | Should | Bounty on a need, priced in Tolken; the owner funds it from balance and releases it to the contributor. No money, no checkout |
 | Intersections feed | Should | Projects sharing tags across types |
-| Source upload: open or closed | Should | Upload a zip. Open is public; closed unlocks through the mock checkout. File tree, viewer, download |
+| Source upload: open | Should | Upload a zip. Source is open to read and download. File tree, viewer, download |
 | Ideas: post an idea, others join and build | Should | An idea is a project at stage `idea` with a README; reuses needs, matching, collab requests, and comments |
-| Idea checks: market and cool factor | Should | The poster picks either, both, or neither. Market check: TinyFish plus an LLM, cited report with a verdict. Cool factor: a 1 to 10 score on novelty, demo appeal, fun to build with others, and scope. Fixture mode for the demo |
+| Idea checks: market and cool factor | Should | Ideas only. The poster picks either, both, or neither. Market check: TinyFish plus an LLM, cited report with a verdict. Cool factor: a 1 to 10 score on novelty, demo appeal, fun to build with others, and scope. Fixture mode for the demo |
+| Onboarding | Must | Three steps after login: skills, interests, people to follow. Saves the profile matching and recommendations read |
 | Recommendations (For you) | Should | Ranked ideas and projects for you, from your skills and interests |
 | LLM idea suggestions | Could | Generates ideas from your skills and platform gaps; one click to post |
 
 **Demo script**
 
-1. Log in as a hardware maker; open their plant-monitor project.
-2. It shows a need: "firmware help (ESP32)."
-3. Open People for this project: ranked list with the matching skill highlighted; one row is flagged "reciprocal".
-4. Switch to Graph view: the project sits at the center, its fillers around it, and a 3-way ring (firmware, sound design, 3D modeling) lights up.
-5. Send a collab request; switch accounts and accept. The owner funds the $50 bounty through the mock checkout and releases it; the contributor sees it as Released and their earnings go up.
-6. Show the intersections feed linking the plant monitor to a generative art piece that uses sensor data.
-7. Open a closed-source project's Source tab: the file tree shows but contents are locked. Unlock it through the mock checkout and read a file.
-8. Post an idea from Create and switch on both checks. The result page shows the market report, the cool-factor score, and the People graph with the swap and the ring lit.
-9. Accept the ring from Inbox, set team shares, and list the project for sale in test mode.
-10. Open the Home feed's For you tab: ranked ideas with reason chips. Join one.
+1. Log in and finish onboarding: pick three skills, two interests, follow two people.
+2. Open a video: "a hardware maker's plant-monitor project."
+3. It shows a need: "firmware help (ESP32)."
+4. Open People for this project: ranked list with the matching skill highlighted; one row is flagged "reciprocal".
+5. Switch to Graph view: the project sits at the center, its fillers around it, and a 3-way ring (firmware, sound design, 3D modeling) lights up.
+6. Send a collab request; switch accounts and accept. The owner funds the `◈ 50` bounty from their Tolken balance and releases it; the contributor sees it as Released and their balance goes up.
+7. Show the intersections feed linking the plant monitor to a generative art piece that uses sensor data.
+8. Open an open-source project's Source tab: browse a file and download the zip.
+9. Post an idea from Create and switch on both checks. The result page shows the market report, the cool-factor score, and the People graph with the swap and the ring lit. Open a project's results page and show that it has no checks, only people.
+10. Accept the ring from Inbox and set team shares so the Tolken split totals 100%.
+11. Open the Home feed's For you tab: ranked ideas with reason chips. Join one.
 
 Seed 15 to 20 projects and 10 profiles beforehand, including one swap and one 3-way ring on purpose. Pre-run one research report in fixture mode so the demo never waits on the network.
 
@@ -75,7 +78,7 @@ Seed 15 to 20 projects and 10 profiles beforehand, including one swap and one 3-
 | Criterion | How Nodal answers it |
 | --- | --- |
 | Innovation | Cross-discipline needs/offers matching across software, hardware, and creative work; projects as nodes in a network; ideas others can join, and an AI agent that checks whether an idea looks viable |
-| Technical complexity | Graph matching (directed graph over people and projects, swap and 3-way ring detection), a node graph view, JWT plus RLS across Next.js, FastAPI, and Supabase, a payment state machine (fund, release, refund) behind a swappable provider, safe zip ingestion with gated source access, and a citation-checked research agent on TinyFish and an LLM |
+| Technical complexity | Graph matching (directed graph over people and projects, swap and 3-way ring detection), a node graph view, JWT plus RLS across Next.js, FastAPI, and Supabase, a Tolken bounty ledger with an in-app balance and release flow, safe zip ingestion, and a citation-checked research agent on TinyFish and an LLM |
 | Design and usability | A familiar social-app layout (feed, stories, Explore grid) with repo-style project pages, the same screens on desktop and mobile, color-coded project types, reason chips |
 | Presentation | One 3-minute demo loop; a seeded ring so the graph lights up on cue |
 
@@ -100,9 +103,10 @@ Nodal looks and behaves like a social app for builders: Instagram's structure wi
 
 **What is new in the flow**
 
-1. **Create** is one screen for ideas and projects. Under the caption, the poster chooses what Nodal should check: **Market check**, **Cool factor**, both, or neither.
-2. **Checks and people** (the result page) shows the chosen checks next to the People graph. The graph connects the post to people with matching skills, and highlights swaps and 3-way rings.
-3. **Team and sell**: accepted collaborators become team members with revenue shares. A project can be listed for sale as open or closed source, and test sales split by share.
+1. **Onboarding** is three steps after login: skills, interests, and people to follow. Those answers are exactly what matching and recommendations read.
+2. **Create** is one screen for ideas and projects. Ideas ask what Nodal should check (**Market check**, **Cool factor**, both, or neither); projects skip checks entirely.
+3. **Checks and people** (the result page) shows the chosen checks next to the People graph for ideas. Projects get the same People graph with no checks.
+4. **Team and shares**: accepted collaborators become team members. Shares split Tolken bounties; there is no selling, pricing, or checkout.
 
 **Cool factor** is deliberately separate from the market check. It ignores money and scores how much people will want to watch and build the project: novelty, demo appeal, fun to build with others, and weekend-sized scope. It is a lens for projects that are worth doing even if they are not companies.
 
@@ -112,8 +116,9 @@ Nodal looks and behaves like a social app for builders: Instagram's structure wi
 
 ```
 Browser (Next.js, shadcn/ui)
-   |-- REST + Supabase JWT --> FastAPI (matching, feed, collab, payments, source, recommendations, research)
+   |-- REST + Supabase JWT --> FastAPI (matching, feed, collab, Tolken, source, recommendations, research)
    |                              |-- user JWT (RLS applies) --> Supabase Postgres
+   |                              |-- service role --> Tolken ledger, source text, research writes
    |                              |-- research agent --> TinyFish (search, fetch) and an LLM (OpenRouter; Ollama for local dev)
    |-- direct: login, comments, uploads --> Supabase (Auth, Postgres, Storage)
 ```
@@ -124,25 +129,24 @@ Rule: anything that needs logic goes through FastAPI; simple reads and writes go
 
 ## Data model
 
-Eight tables plus `unlocks`, `contributions`, `source_files`, and `source_contents`. `projects` gains `source_access` (none, open, or closed), `profiles` gains `earned_cents`, and `project_needs` gains `bounty_cents`. `projects` also gains `stage` (idea, building, shipped) and `readme_md`, and `profiles` gains `interests`. Three more tables: `research_runs`, `idea_suggestions`, and `recommendation_dismissals`. See `BACKEND.md` for the full SQL.
+Eight tables plus `source_files`, `source_contents`, and `tolken_ledger`. `projects` gains `source_access` (none or open), `profiles` gains `tolken_balance`, and `project_needs` gains `bounty_tolken`. `projects` also gains `stage` (idea, building, shipped) and `readme_md`, and `profiles` gains `interests`. Three more tables: `research_runs`, `idea_suggestions`, and `recommendation_dismissals`. See `BACKEND.md` for the full SQL.
 
 | Table | Purpose |
 | --- | --- |
-| profiles | One per user |
-| projects | Published work or idea (type, stage, readme_md, links, source_access, price_cents) |
+| profiles | One per user, with a Tolken balance |
+| projects | Published work or idea (type, stage, readme_md, links, source_access) |
 | skills | Seeded taxonomy (about 60 rows) |
-| project_needs | What a project is missing |
+| project_needs | What a project is missing, with an optional Tolken bounty |
 | profile_offers | What a person can do, with level 1 to 3 |
 | project_tags | Free tags for the intersections feed |
 | comments | Discussion |
 | collab_requests | Match follow-up |
-| unlocks | Who has paid to unlock a closed-source project: (profile_id, project_id, amount) |
 | source_files | File tree of an uploaded project: path, size, is_text |
-| source_contents | Text of each file; service-role only so closed source cannot leak |
+| source_contents | Text of each file; readable by everyone, since source is open |
 | research_runs | One market-research run per idea: status, live steps, report, sources, model |
 | idea_suggestions | LLM-generated ideas for a user, with dismissed and posted flags |
 | recommendation_dismissals | Items a user hid from their For you feed |
-| contributions | A paid piece of work: need, owner, contributor, amount, status |
+| tolken_ledger | Every Tolken movement: fund, release, refund, with a status per bounty |
 
 The graph is derived at query time from needs, offers, and ownership; it adds no tables.
 
@@ -181,11 +185,12 @@ See `BACKEND.md` for the endpoint table and contracts.
 
 shadcn/ui (Lucide is its default icon set) over DaisyUI, wrapped in a custom social app shell. See `FRONTEND.md` and the mockup it was built from (16 artboards: 8 screens, desktop and mobile).
 
-## Auth, paid access, security
+## Auth, source access, security
 
-- Supabase Auth: GitHub OAuth and email magic link; a DB trigger creates the `profiles` row on signup.
-- Closed source: file contents and the zip are readable only by the owner or a user with an `unlocks` row; the file tree is a public preview. File text lives in a table with no read policies, and the zip sits in a private bucket behind 60-second signed URLs. Unlock is mocked (fake checkout, no money).
+- Supabase Auth: GitHub OAuth and email magic link; a DB trigger creates the `profiles` row on signup, and `/onboarding` fills in skills, interests, and follows.
+- Source is always open: file contents and the zip are readable by anyone, the tree is public. No unlocks, no prices.
 - Zip uploads: size, file-count, and expanded-size limits; reject `..`, absolute paths, and symlinks; skip `.git`, `node_modules`, and `.env` files; never execute or render uploaded code.
+- Tolken: balances and the ledger are written only by FastAPI (service role); users can read their own row. No money, no provider, no payouts anywhere in the product.
 - Research agent: fetched pages are untrusted data; the agent has no tools beyond TinyFish search and fetch; API keys stay in backend env; per-user daily run limit.
 - RLS on every table, tested with a second account.
 - Service key never reaches the browser.
@@ -193,7 +198,7 @@ shadcn/ui (Lucide is its default icon set) over DaisyUI, wrapped in a custom soc
 
 ## Ideas
 
-An idea is a project with `stage = 'idea'`: a README (the problem, who it is for, the plan), tags, and needs. Because it is a project, everything else already works: needs and offers matching, collab requests ("Join this idea"), comments, bounties, and the node graph. When the team starts building, the owner graduates it (`stage` becomes `building`) and can attach source. Stages: `idea`, `building`, `shipped`.
+An idea is a project with `stage = 'idea'`: a README (the problem, who it is for, the plan), tags, and needs. Ideas and projects are one thing in Nodal, separated only by stage. Because it is a project, everything else already works: needs and offers matching, collab requests ("Join this idea"), comments, Tolken bounties, and the node graph. Market and cool-factor checks are for ideas only; once a project is building or shipped, its results page shows people who fit and no checks. When the team starts building, the owner graduates it (`stage` becomes `building`) and can attach source. Stages: `idea`, `building`, `shipped`.
 
 ## Market research agent
 
@@ -225,38 +230,37 @@ An owner can run a research agent on an idea. It searches the web with TinyFish,
 
 Users can upload a project's source as a zip, like a simplified GitHub. Each project has a `source_access` setting:
 
-| Mode | Who sees the file tree | Who reads files and downloads | Price |
-| --- | --- | --- | --- |
-| none | No source | No source | None |
-| open | Everyone | Everyone, no login needed | Free |
-| closed | Everyone (a preview) | The owner and users who unlocked it | `price_cents`, minimum $1 |
+| Mode | Who sees the file tree | Who reads files and downloads |
+| --- | --- | --- |
+| none | No source | No source |
+| open | Everyone | Everyone, no login needed |
 
-**Flow:** the owner picks a mode and uploads a zip. The server checks limits, skips dependencies and secrets, and builds a file tree. The Source tab on the project page shows the tree and a file viewer. On a closed project a visitor sees the tree with lock icons; Unlock goes through the mock checkout, the owner's earnings go up, and the files open.
+**Flow:** the owner picks whether there is source and uploads a zip. The server checks limits, skips dependencies and secrets, and builds a file tree. The Source tab on the project page shows the tree and a file viewer. There is no paid or locked mode.
 
 **Not a git host:** there are no commits, branches, or diffs. A re-upload replaces the snapshot. Versions and diffs are a roadmap item.
 
-## Payments (mock)
+## Tolken (in-app currency)
 
-Owners can attach a bounty to a need; the contributor is "paid" when the owner releases it. Payments are mocked end to end: no Stripe, no real money, and every payment screen is labeled "Demo payment". The state machine and flow match a real escrow, so a provider can replace the mock later.
+There is no money in Nodal. Tolken (`◈`) is the in-app currency, and it is the only thing a bounty can be priced in. Balances are whole numbers; funding and releasing move Tolken between two accounts and the server records each movement in `tolken_ledger`.
 
 **Flow**
 
-1. The owner adds a need with an optional bounty (`bounty_cents`).
-2. A contributor requests to collab; the owner accepts. If the need has a bounty, accepting creates a `contributions` row in `pending_funding`.
-3. The owner clicks Fund and lands on a fake checkout page (prefilled demo card, clearly labeled). **Pay** marks the contribution `funded`.
-4. When the work is done, the owner releases it: the status becomes `released` and the contributor's `earned_cents` goes up.
-5. Before release, the owner can cancel: a funded bounty becomes `refunded`, an unfunded one `cancelled`. Only the status changes; no money moves.
+1. The owner adds a need with an optional bounty in Tolken (`bounty_tolken`).
+2. A contributor requests to collab; the owner accepts. If the need has a bounty, accepting creates a ledger row in `pending_funding`.
+3. The owner funds it from the project's Needs tab. The balance drops by the bounty and the row becomes `funded`. There is no checkout screen and no card.
+4. When the work is done, the owner releases it: the status becomes `released`, the contributor's balance goes up, and their team share applies when the bounty was pooled.
+5. Before release, the owner can cancel: a funded bounty becomes `refunded` (Tolken returns to the owner), an unfunded one `cancelled`.
 
 Statuses: `pending_funding` to `funded` to `released`; `funded` to `refunded`; `pending_funding` to `cancelled`. Nothing moves out of `released`.
 
 **Rules**
 
-- One function enforces the allowed status transitions; every payment endpoint checks ownership in code.
-- Money is integer cents; the platform fee is configurable (`PLATFORM_FEE_BPS`, default 0).
-- The mock-pay endpoint only works when `PAYMENTS_MODE=mock`, so it cannot fake payments if a real provider is added later.
-- A small `PaymentProvider` interface with a `MockProvider` keeps the swap cheap.
+- One function enforces the allowed status transitions; every ledger endpoint checks ownership in code.
+- Amounts are non-negative integers of Tolken; there is no platform fee because no money is involved.
+- Funding fails with a clear error when the balance is too low.
+- Team shares split pooled Tolken and must total 100%.
 
-**Roadmap line for the demo:** Stripe Connect (Express accounts, Checkout to fund, a transfer on release) plugs in behind the same interface. Live-mode payouts need Stripe account review and legal review, so they are out of scope.
+**Why not money:** buying and selling source was cut. It changed what Nodal is, forced checkout screens into a social app, and made the demo about payments instead of matching. Tolken keeps the incentive loop without any of that.
 
 ## Build plan
 
@@ -266,7 +270,7 @@ Phases are sequential by gate, not by clock. Assumes three people.
 | --- | --- | --- |
 | 1. Foundation | Schema (including idea stage and README), auth, skills seed, create and list projects and ideas | Log in and create a project |
 | 2. Core loop | Needs and offers, matching API and UI, graph service (swaps, rings) | Match list works and the seeded ring is detected |
-| 3. Polish | Graph view, comments, collab asks, feed, source upload with mock unlock, mock contributor payments, research agent, For you feed | Demo script runs clean twice |
+| 3. Polish | Graph view, comments, collab asks, feed, source upload, Tolken bounties, research agent, For you feed, onboarding | Demo script runs clean twice |
 | 4. Freeze | Seed 15 to 20 projects, deploy, rehearse | Deployed link works on a phone |
 
 | Role | Owns |
@@ -275,7 +279,7 @@ Phases are sequential by gate, not by clock. Assumes three people.
 | Backend | FastAPI endpoints, matching query, JWT dependency, deploy |
 | Data and demo | Schema and RLS, skills seed, seed projects, demo script, slides |
 
-**Cut order if behind:** profile contribution heatmap, the stories row, LLM idea suggestions, intersections feed, the source file viewer (keep the zip download), accept/decline on collab requests (keep "request"), graph view polish (fall back to listing each cycle as text), then contributor payments. If the choice is research agent or payments, keep the research agent. Never cut the match view or cycle detection.
+**Cut order if behind:** profile contribution heatmap, the stories row, LLM idea suggestions, intersections feed, the source file viewer (keep the zip download), accept/decline on collab requests (keep "request"), graph view polish (fall back to listing each cycle as text), then Tolken bounties. If the choice is research agent or bounties, keep the research agent. Never cut the match view, onboarding, or cycle detection.
 
 **Risks**
 
@@ -284,7 +288,7 @@ Phases are sequential by gate, not by clock. Assumes three people.
 - JWT or CORS trouble between Next.js and FastAPI: ship one protected endpoint end to end in phase 1.
 - Taxonomy too coarse: try 10 realistic needs against it before phase 2 closes.
 - Cycle detection finds nothing on thin data: seed one swap and one ring on purpose.
-- Mock payments read as real: label every payment screen "Demo payment, no money moves" so nobody is misled.
+- Tolken reads as real money: label it "in-app currency" everywhere and never show a card or checkout.
 - Zip uploads are an attack surface (zip bombs, path traversal, leaked secrets): enforce the limits in `BACKEND.md` and test with a malicious zip before the demo.
 - The research agent gives a confident verdict from thin or wrong evidence: it must cite sources, the server forces `not_enough_evidence` on thin results, and the UI labels it AI-generated.
 - Ollama cannot be reached from a cloud backend: use OpenRouter for the deployed demo and keep Ollama for local development only.
@@ -292,4 +296,4 @@ Phases are sequential by gate, not by clock. Assumes three people.
 - Prompt injection from fetched pages: treat pages as data, give the agent no extra tools, and validate its output.
 - Cool factor reads as a fact: label it "AI score", show the four measures, and never present it as demand.
 - Two layouts double the front-end work: build the app shell and PostCard once as responsive components, and build mobile from the same data hooks.
-- Share splits that do not total 100%: block listing until they do, and show the total live.
+- Share splits that do not total 100%: show the total live and block bounty funding until they do.

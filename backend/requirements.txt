@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+pydantic>=2
+pydantic-settings
+supabase
+httpx
+pyjwt
+slowapi
+python-multipart
+openai
+pytest
