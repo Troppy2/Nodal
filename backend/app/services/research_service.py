@@ -1,15 +1,21 @@
 """Market check and cool factor (docs/BACKEND.md "Research agent", "Cool factor check").
 
-Only fixture mode is implemented: the run streams canned steps, then stores the sample report from
-fixtures/research_report.json, labeled as a sample. The live TinyFish + LLM pipeline plugs in here later."""
+Fixture mode streams canned steps, then stores the sample report from fixtures/research_report.json,
+labeled as a sample. Live mode runs `research_pipeline` (TinyFish + LLM) and writes progress as it goes."""
 
 import hashlib
 import json
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from ..config import settings
 from ..db import service_client
+from . import research_pipeline as pipeline
+from .llm import LLMError, llm_json
+from .webresearch import TinyFishWebResearch
 
 FIXTURE = Path(__file__).resolve().parents[2] / "fixtures" / "research_report.json"
 STEP_DELAY_S = 0.4
@@ -44,7 +50,7 @@ def runs_today(profile_id: str) -> int:
 
 def create_run(project_id: str, profile_id: str, ihash: str, checks: list[str]) -> dict:
     return service_client().table("research_runs").insert({
-        "project_id": project_id, "requested_by": profile_id, "status": "queued", "mode": "fixture",
+        "project_id": project_id, "requested_by": profile_id, "status": "queued", "mode": settings.research_mode,
         "idea_hash": ihash, "checks": sorted(checks),
     }).execute().data[0]
 
@@ -69,6 +75,66 @@ def run_fixture(run_id: str, checks: list[str]) -> None:
         }).eq("id", run_id).execute()
     except Exception as exc:  # keep the run readable instead of stuck in "running"
         sb.table("research_runs").update({"status": "failed", "error": str(exc)[:200]}).eq("id", run_id).execute()
+
+
+def run_live(run_id: str, project: dict, checks: list[str], web=None, llm=None) -> None:
+    """Background task. Market and cool run in parallel; each result is written as soon as it is ready,
+    so the page can show one check while the other loads. `web` and `llm` are injectable for tests."""
+    sb = service_client()
+    web = web or TinyFishWebResearch()
+    llm = llm or llm_json
+    deadline = time.monotonic() + settings.research_timeout_s
+    steps: list[dict] = []
+    lock = threading.Lock()
+
+    def write(values: dict) -> None:
+        with lock:
+            sb.table("research_runs").update(values).eq("id", run_id).execute()
+
+    def on_step(label: str) -> None:
+        with lock:
+            steps.append({"at": now(), "label": label})
+            sb.table("research_runs").update({"steps": list(steps)}).eq("id", run_id).execute()
+
+    def market() -> str:
+        try:
+            out = pipeline.market_check(project, web, llm, on_step, deadline)
+            write({"report": out["report"], "sources": out["sources"]})
+            return "done"
+        except pipeline.Deadline as exc:
+            partial = getattr(exc, "partial", None)
+            if partial:
+                write({"sources": partial["sources"]})
+                return "partial"
+            return "failed:Timed out before any facts were found"
+        except LLMError as exc:
+            return f"failed:{exc}"
+
+    def cool() -> str:
+        try:
+            result = pipeline.cool_factor(project, web, llm, on_step)
+        except LLMError as exc:
+            return f"failed:{exc}"
+        if result is None:
+            return "failed:Cool factor came back without reasons"
+        write({"cool": result})
+        return "done"
+
+    write({"status": "running", "model": settings.llm_model})
+    try:
+        jobs = [fn for name, fn in (("market", market), ("cool", cool)) if name in checks]
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda fn: fn(), jobs))
+        errors = [r.split(":", 1)[1] for r in results if r.startswith("failed:")]
+        if all(r == "done" for r in results):
+            status = "done"
+        elif any(r in ("done", "partial") for r in results):
+            status = "partial"
+        else:
+            status = "failed"
+        write({"status": status, "finished_at": now(), "error": "; ".join(errors)[:200] or None})
+    except Exception as exc:  # keep the run readable instead of stuck in "running"
+        write({"status": "failed", "finished_at": now(), "error": str(exc)[:200]})
 
 
 def serialize(run: dict) -> dict:

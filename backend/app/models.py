@@ -155,6 +155,13 @@ class CollabIn(BaseModel):
     message: str | None = Field(default=None, max_length=1000)
 
 
+class ProjectLiteRef(BaseModel):
+    id: str
+    title: str
+    type: ProjectType
+    owner: ProfileLite
+
+
 class CollabOut(BaseModel):
     id: str
     project: ProjectLiteRef
@@ -163,13 +170,6 @@ class CollabOut(BaseModel):
     message: str | None = None
     status: Literal["pending", "accepted", "declined"]
     created_at: str
-
-
-class ProjectLiteRef(BaseModel):
-    id: str
-    title: str
-    type: ProjectType
-    owner: ProfileLite
 
 
 class RespondIn(BaseModel):
