@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { ArrowUpRight, Loader2, Send } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowUpRight, ChevronLeft, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar } from "@/components/Avatar";
 import { EmptyState, ErrorState, RowsSkeleton } from "@/components/checks/States";
@@ -82,16 +82,40 @@ function Bubble({ message }: { message: MessageOut }) {
 }
 
 /** A 1:1 thread: the invite, any follow-up, and free-form replies in one place. */
-export function MessageThread({ profileId }: { profileId: string }) {
+export function MessageThread({
+  profileId,
+  onBack,
+}: {
+  profileId: string;
+  onBack?: () => void;
+}) {
   const thread = useApi<ThreadOut>(`/messages/${profileId}`);
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [nudging, setNudging] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const initialScrolledRef = useRef(false);
+
+  const messageCount = thread.data?.messages.length ?? 0;
 
   useEffect(() => {
     // Opening a thread clears its unread count in the list.
     invalidate("/me/conversations");
   }, [profileId]);
+
+  useEffect(() => {
+    initialScrolledRef.current = false;
+  }, [profileId]);
+
+  useEffect(() => {
+    if (messageCount === 0) return;
+    if (!initialScrolledRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+      initialScrolledRef.current = true;
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messageCount]);
 
   async function send() {
     const text = body.trim();
@@ -123,96 +147,180 @@ export function MessageThread({ profileId }: { profileId: string }) {
     }
   }
 
-  if (thread.error) return <ErrorState error={thread.error} onRetry={thread.reload} className="py-8" />;
-  if (!thread.data) return <RowsSkeleton rows={3} className="py-4" />;
+  if (thread.error) {
+    return (
+      <div className="flex h-full flex-col min-h-0 bg-white">
+        <header className="shrink-0 border-b border-line bg-white px-4 py-3 lg:px-8 lg:py-3.5">
+          <div className="mx-auto flex max-w-[720px] items-center gap-3">
+            {onBack && (
+              <button
+                type="button"
+                onClick={onBack}
+                aria-label="Back to messages"
+                className="flex size-9 items-center justify-center rounded-lg text-ink hover:bg-sunken -ml-1 lg:hidden"
+              >
+                <ChevronLeft className="size-5" />
+              </button>
+            )}
+            <span className="text-sm font-semibold">Messages</span>
+          </div>
+        </header>
+        <div className="flex-1 overflow-y-auto p-4">
+          <ErrorState error={thread.error} onRetry={thread.reload} className="py-8" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!thread.data) {
+    return (
+      <div className="flex h-full flex-col min-h-0 bg-white">
+        <header className="shrink-0 border-b border-line bg-white px-4 py-3 lg:px-8 lg:py-3.5">
+          <div className="mx-auto flex max-w-[720px] items-center gap-3">
+            {onBack && (
+              <button
+                type="button"
+                onClick={onBack}
+                aria-label="Back to messages"
+                className="flex size-9 items-center justify-center rounded-lg text-ink hover:bg-sunken -ml-1 lg:hidden"
+              >
+                <ChevronLeft className="size-5" />
+              </button>
+            )}
+            <div className="size-10 rounded-full bg-sunken animate-pulse" />
+            <div className="h-4 w-32 rounded bg-sunken animate-pulse" />
+          </div>
+        </header>
+        <div className="flex-1 overflow-y-auto px-4 py-6 lg:px-8">
+          <div className="mx-auto max-w-[720px]">
+            <RowsSkeleton rows={3} className="py-4" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const { profile, project, messages, can_nudge } = thread.data;
   const name = displayName(profile);
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-[720px] flex-col gap-4">
-      <header className="flex items-center gap-3">
-        <Avatar person={profile} size={44} />
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-lg font-extrabold tracking-tight">{name}</h2>
-          <p className="flex items-center gap-2 text-[13px] text-muted-ink">
-            <span className="truncate">@{profile.handle}</span>
-            {project && (
-              <Link
-                href={`/projects/${project.id}`}
-                className="flex min-w-0 items-center gap-0.5 truncate font-medium text-ink hover:underline"
-              >
-                <span className="truncate">{project.title}</span>
-                <ArrowUpRight className="size-3 shrink-0" />
-              </Link>
-            )}
-          </p>
+    <div className="flex h-full flex-col min-h-0 bg-white">
+      <header className="shrink-0 border-b border-line bg-white px-4 py-3 lg:px-8 lg:py-3.5">
+        <div className="mx-auto flex max-w-[720px] items-center gap-3">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              aria-label="Back to messages"
+              className="flex size-9 items-center justify-center rounded-lg text-ink hover:bg-sunken -ml-1 lg:hidden"
+            >
+              <ChevronLeft className="size-5" />
+            </button>
+          )}
+          <Avatar person={profile} size={42} />
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-[15px] sm:text-base font-extrabold tracking-tight">{name}</h2>
+            <p className="flex items-center gap-2 text-xs sm:text-[13px] text-muted-ink">
+              <span className="truncate">@{profile.handle}</span>
+              {project && (
+                <Link
+                  href={`/projects/${project.id}`}
+                  className="flex min-w-0 items-center gap-0.5 truncate font-medium text-ink hover:underline"
+                >
+                  <span className="truncate">{project.title}</span>
+                  <ArrowUpRight className="size-3 shrink-0" />
+                </Link>
+              )}
+            </p>
+          </div>
+          <Link
+            href={`/u/${profile.handle}`}
+            className={cn(btn.secondary, "h-8 px-2.5 text-xs sm:h-9 sm:px-3 sm:text-sm shrink-0")}
+          >
+            <span className="hidden sm:inline">View profile</span>
+            <span className="sm:hidden">Profile</span>
+          </Link>
         </div>
-        <Link href={`/u/${profile.handle}`} className={cn(btn.secondary, "h-9 max-sm:hidden")}>
-          View profile
-        </Link>
       </header>
 
-      {messages.length === 0 ? (
-        <EmptyState
-          title={`Message ${name}`}
-          body="Say hello, or ask what they're working on. Invites you send from a project show up here too."
-          className="py-8"
-        />
-      ) : (
-        <ul className="flex flex-col gap-2.5 py-2">
-          {messages.map((m) => (
-            <Bubble key={m.id} message={m} />
-          ))}
-        </ul>
-      )}
-
-      {can_nudge && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-teal/30 bg-teal-tint/60 px-3 py-2">
-          <p className="text-[13px]">
-            <span className="font-semibold">Invite sent.</span> <span className="text-muted-ink">No reply yet.</span>
-          </p>
-          <button
-            onClick={nudge}
-            disabled={nudging}
-            className="text-[13px] font-semibold text-teal hover:underline disabled:opacity-60"
-          >
-            {nudging && <Loader2 className="mr-1 inline size-3.5 animate-spin" />}
-            Ask if they&apos;ve seen it
-          </button>
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 lg:px-8">
+        <div className="mx-auto max-w-[720px]">
+          {messages.length === 0 ? (
+            <EmptyState
+              title={`Message ${name}`}
+              body="Say hello, or ask what they're working on. Invites you send from a project show up here too."
+              className="py-12"
+            />
+          ) : (
+            <ul className="flex flex-col gap-2.5 py-2">
+              {messages.map((m) => (
+                <Bubble key={m.id} message={m} />
+              ))}
+              <div ref={messagesEndRef} />
+            </ul>
+          )}
         </div>
-      )}
+      </div>
 
-      <form
-        className="flex items-end gap-2 border-t border-line pt-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          send();
-        }}
-      >
-        <label htmlFor="message-body" className="sr-only">
-          Message {name}
-        </label>
-        <textarea
-          id="message-body"
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
+      <div className="shrink-0 border-t border-line bg-white px-4 py-3 lg:px-8 lg:py-3.5 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="mx-auto max-w-[720px]">
+          {can_nudge && (
+            <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-teal/30 bg-teal-tint/60 px-3 py-2">
+              <p className="text-[13px]">
+                <span className="font-semibold">Invite sent.</span> <span className="text-muted-ink">No reply yet.</span>
+              </p>
+              <button
+                type="button"
+                onClick={nudge}
+                disabled={nudging}
+                className="text-[13px] font-semibold text-teal hover:underline disabled:opacity-60"
+              >
+                {nudging && <Loader2 className="mr-1 inline size-3.5 animate-spin" />}
+                Ask if they&apos;ve seen it
+              </button>
+            </div>
+          )}
+
+          <form
+            className="flex items-end gap-2"
+            onSubmit={(e) => {
               e.preventDefault();
               send();
-            }
-          }}
-          rows={2}
-          maxLength={2000}
-          placeholder={`Message ${name.split(" ")[0]}`}
-          className="min-h-11 flex-1 resize-none rounded-lg border border-line px-3 py-2.5 text-sm outline-none placeholder:text-muted-ink focus:border-ink"
-        />
-        <button type="submit" disabled={!body.trim() || sending} className={cn(btn.primary, "h-11 px-3.5")}>
-          {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-          <span className="max-sm:sr-only">Send</span>
-        </button>
-      </form>
+            }}
+          >
+            <label htmlFor="message-body" className="sr-only">
+              Message {name}
+            </label>
+            <textarea
+              id="message-body"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+              rows={1}
+              maxLength={2000}
+              placeholder={`Message ${name.split(" ")[0]}`}
+              className="min-h-11 max-h-32 flex-1 resize-none rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm outline-none placeholder:text-muted-ink hover:border-ink/30 focus:border-ink"
+            />
+            <button
+              type="submit"
+              disabled={!body.trim() || sending}
+              className={cn(
+                btn.primary,
+                "h-11 px-3.5 sm:px-4 rounded-xl flex items-center justify-center gap-1.5 font-semibold shrink-0 transition-opacity",
+                (!body.trim() || sending) && "opacity-50 cursor-not-allowed",
+              )}
+            >
+              {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+              <span className="max-sm:sr-only">Send</span>
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }

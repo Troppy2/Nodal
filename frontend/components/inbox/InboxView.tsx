@@ -315,35 +315,54 @@ export function InboxView() {
   }
 
   const detail = messageProfileId ? (
-    <MessageThread profileId={messageProfileId} />
+    <MessageThread profileId={messageProfileId} onBack={() => select(null)} />
   ) : selected ? (
-    <div className="flex flex-col gap-4">
-      <header className="flex items-center gap-3">
-        <Faces people={selected.people} size={44} />
-        <div className="min-w-0">
-          <h2 className="truncate text-lg font-extrabold tracking-tight">
-            {selected.kind === "collab"
-              ? describe(selected).title
-              : `${selected.kind === "swap" ? "Swap" : "3-way ring"} with ${joinNames(selected.people.map(displayName))}`}
-          </h2>
-          <p className="text-[13px] text-muted-ink">
-            {selected.direction === "incoming" ? "Received" : "Sent"}{" "}
-            {ago(selected.created_at) === "now" ? "just now" : `${ago(selected.created_at)} ago`}
-          </p>
+    <div className="flex h-full flex-col min-h-0 bg-white">
+      <header className="shrink-0 border-b border-line bg-white px-4 py-3 lg:px-8 lg:py-3.5">
+        <div className="mx-auto flex max-w-[720px] items-center gap-3">
+          <button
+            type="button"
+            onClick={() => select(null)}
+            className="flex size-9 items-center justify-center rounded-lg text-ink hover:bg-sunken -ml-1 lg:hidden"
+            aria-label="Back to inbox"
+          >
+            <ChevronLeft className="size-5" />
+          </button>
+          <Faces people={selected.people} size={40} />
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-base lg:text-lg font-extrabold tracking-tight">
+              {selected.kind === "collab"
+                ? describe(selected).title
+                : `${selected.kind === "swap" ? "Swap" : "3-way ring"} with ${joinNames(selected.people.map(displayName))}`}
+            </h2>
+            <p className="text-xs lg:text-[13px] text-muted-ink">
+              {selected.direction === "incoming" ? "Received" : "Sent"}{" "}
+              {ago(selected.created_at) === "now" ? "just now" : `${ago(selected.created_at)} ago`}
+            </p>
+          </div>
         </div>
       </header>
-      {selected.kind === "collab" ? (
-        <CollabCard item={selected} busy={busy} onRespond={(r) => respond(selected, r)} />
-      ) : (
-        <RingInviteCard item={selected} me={meProfile} busy={busy} onRespond={(r) => respond(selected, r)} />
-      )}
+      <div className="flex-1 overflow-y-auto px-4 py-5 lg:px-8 lg:py-7">
+        <div className="mx-auto max-w-[720px]">
+          {selected.kind === "collab" ? (
+            <CollabCard item={selected} busy={busy} onRespond={(r) => respond(selected, r)} />
+          ) : (
+            <RingInviteCard item={selected} me={meProfile} busy={busy} onRespond={(r) => respond(selected, r)} />
+          )}
+        </div>
+      </div>
     </div>
   ) : null;
 
   return (
-    <div className="lg:grid lg:min-h-dvh lg:grid-cols-[380px_minmax(0,1fr)]">
-      <aside className={cn("border-line lg:border-r", hasSelection && "max-lg:hidden")}>
-        <header className="flex flex-col gap-3 px-5 pb-3 pt-5 sm:flex-row sm:items-center sm:justify-between">
+    <div className="lg:grid lg:h-dvh lg:grid-cols-[380px_minmax(0,1fr)] lg:overflow-hidden">
+      <aside
+        className={cn(
+          "border-line lg:border-r lg:flex lg:flex-col lg:h-dvh lg:min-h-0 lg:overflow-hidden bg-white",
+          hasSelection && "max-lg:hidden",
+        )}
+      >
+        <header className="shrink-0 flex flex-col gap-3 px-5 pb-3 pt-5 sm:flex-row sm:items-center sm:justify-between border-b border-line bg-white">
           <h1 className="text-2xl font-extrabold tracking-tight">
             Inbox
             {pendingCount > 0 && <span className="ml-2 text-base font-semibold text-teal">{pendingCount} to answer</span>}
@@ -358,92 +377,100 @@ export function InboxView() {
           />
         </header>
 
-        {filter === "messages" ? (
-          conversations.error ? (
-            <ErrorState error={conversations.error} onRetry={conversations.reload} />
-          ) : !conversations.data ? (
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {filter === "messages" ? (
+            conversations.error ? (
+              <ErrorState error={conversations.error} onRetry={conversations.reload} />
+            ) : !conversations.data ? (
+              <RowsSkeleton rows={4} className="px-5 py-3" />
+            ) : convos.length === 0 ? (
+              <EmptyState
+                title="No messages yet"
+                body="Invite someone to your project from People who fit, or message a person from their profile."
+                action={
+                  <Link href="/explore" className={btn.secondary}>
+                    Explore projects
+                  </Link>
+                }
+              />
+            ) : (
+              <ul>
+                {convos.map((c) => (
+                  <ConversationRow
+                    key={c.profile.id}
+                    item={c}
+                    active={c.profile.id === messageProfileId}
+                    onOpen={() => select(`m:${c.profile.id}`)}
+                  />
+                ))}
+              </ul>
+            )
+          ) : inbox.error ? (
+            <ErrorState error={inbox.error} onRetry={inbox.reload} />
+          ) : !inbox.data ? (
             <RowsSkeleton rows={4} className="px-5 py-3" />
-          ) : convos.length === 0 ? (
+          ) : shown.length === 0 ? (
             <EmptyState
-              title="No messages yet"
-              body="Invite someone to your project from People who fit, or message a person from their profile."
+              title={filter === "requests" ? "No requests yet" : "Nothing sent yet"}
+              body={
+                filter === "requests"
+                  ? "When someone offers to help or invites you to a swap, it shows up here."
+                  : "Offer to help on a project, or start a swap below."
+              }
               action={
                 <Link href="/explore" className={btn.secondary}>
-                  Explore projects
+                  Find projects
                 </Link>
               }
             />
           ) : (
-            <ul className="border-t border-line">
-              {convos.map((c) => (
-                <ConversationRow
-                  key={c.profile.id}
-                  item={c}
-                  active={c.profile.id === messageProfileId}
-                  onOpen={() => select(`m:${c.profile.id}`)}
-                />
+            <ul>
+              {shown.map((i) => (
+                <ItemRow key={i.id} item={i} active={i.id === selectedId} onOpen={() => select(i.id)} />
               ))}
             </ul>
-          )
-        ) : inbox.error ? (
-          <ErrorState error={inbox.error} onRetry={inbox.reload} />
-        ) : !inbox.data ? (
-          <RowsSkeleton rows={4} className="px-5 py-3" />
-        ) : shown.length === 0 ? (
-          <EmptyState
-            title={filter === "requests" ? "No requests yet" : "Nothing sent yet"}
-            body={
-              filter === "requests"
-                ? "When someone offers to help or invites you to a swap, it shows up here."
-                : "Offer to help on a project, or start a swap below."
-            }
-            action={
-              <Link href="/explore" className={btn.secondary}>
-                Find projects
-              </Link>
-            }
-          />
-        ) : (
-          <ul className="border-t border-line">
-            {shown.map((i) => (
-              <ItemRow key={i.id} item={i} active={i.id === selectedId} onOpen={() => select(i.id)} />
-            ))}
-          </ul>
-        )}
-        {filter !== "messages" && cycles.data && meProfile && (
-          <CycleSuggestions
-            cycles={cycles.data}
-            items={items}
-            meId={meProfile.id}
-            onInvited={(item) => {
-              inbox.mutate((prev) => [item, ...(prev ?? [])]);
-              setFilter("sent");
-              select(item.id);
-            }}
-          />
-        )}
+          )}
+          {filter !== "messages" && cycles.data && meProfile && (
+            <CycleSuggestions
+              cycles={cycles.data}
+              items={items}
+              meId={meProfile.id}
+              onInvited={(item) => {
+                inbox.mutate((prev) => [item, ...(prev ?? [])]);
+                setFilter("sent");
+                select(item.id);
+              }}
+            />
+          )}
+        </div>
       </aside>
 
-      <section className={cn("px-4 py-5 lg:px-8 lg:py-7", !hasSelection && "max-lg:hidden")} aria-live="polite">
+      <section
+        className={cn(
+          "flex flex-col min-h-0 lg:h-dvh lg:overflow-hidden bg-white",
+          hasSelection
+            ? "max-lg:fixed max-lg:inset-0 max-lg:z-50 max-lg:h-dvh"
+            : "max-lg:hidden",
+        )}
+        aria-live="polite"
+      >
         {hasSelection ? (
-          <>
-            <button onClick={() => select(null)} className={cn(btn.ghost, "-ml-2 mb-3 px-2 lg:hidden")}>
-              <ChevronLeft className="size-5" /> {messageProfileId ? "Messages" : "Inbox"}
-            </button>
-            {detail}
-          </>
+          detail
         ) : selectedId ? (
-          <EmptyState title="That one is gone" body="It may have been withdrawn or deleted." />
+          <div className="flex h-full items-center justify-center p-8">
+            <EmptyState title="That one is gone" body="It may have been withdrawn or deleted." />
+          </div>
         ) : (
-          <EmptyState
-            title={filter === "messages" ? "Pick a conversation" : "Pick a request"}
-            body={
-              filter === "messages"
-                ? "Choose a thread on the left to read it and reply."
-                : "Choose one on the left to see who's asking and answer it."
-            }
-            className="hidden lg:flex"
-          />
+          <div className="hidden h-full items-center justify-center p-8 lg:flex">
+            <EmptyState
+              title={filter === "messages" ? "Pick a conversation" : "Pick a request"}
+              body={
+                filter === "messages"
+                  ? "Choose a thread on the left to read it and reply."
+                  : "Choose one on the left to see who's asking and answer it."
+              }
+            />
+          </div>
         )}
       </section>
     </div>
