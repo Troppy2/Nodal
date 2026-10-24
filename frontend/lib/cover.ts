@@ -1,4 +1,4 @@
-import type { ProjectType } from "./types";
+import type { ProjectType } from "./api-types";
 
 export const tints: Record<ProjectType | "teal", { fg: string; bg: string }> = {
   software: { fg: "#1f4fd8", bg: "#e3eafb" },

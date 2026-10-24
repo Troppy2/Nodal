@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     supabase_jwt_secret: str = "dev-secret-change-me-dev-secret-change-me"
     supabase_service_key: str = ""
     frontend_origin: str = "http://localhost:3000"
+    # Name-only sign-in (POST /auth/name): anyone who types a name signs in as that person.
+    # Fine for the demo; set NAME_SIGNIN_ENABLED=false anywhere real accounts live.
+    name_signin_enabled: bool = True
     source_max_zip_mb: int = 25
     source_max_files: int = 1000
     source_max_uncompressed_mb: int = 100

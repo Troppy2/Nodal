@@ -1,13 +1,15 @@
 "use client";
 
-import { inboxUnread } from "@/lib/catalog";
-import { useDemoStore } from "@/lib/store";
+import type { InboxItem } from "@/lib/api-types";
+import { useSession } from "@/lib/session";
+import { useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 
-/** Requests still waiting on the viewer. */
+/** Requests still waiting on the viewer: inbox items that offer accept/decline. */
 export function usePendingCount() {
-  const { responses } = useDemoStore();
-  return Math.max(0, inboxUnread - Object.keys(responses).length);
+  const { signedIn } = useSession();
+  const { data } = useApi<InboxItem[]>(signedIn ? "/me/inbox" : null);
+  return (data ?? []).filter((i) => i.actions.length > 0).length;
 }
 
 export function InboxBadge({ className }: { className?: string }) {
@@ -15,7 +17,7 @@ export function InboxBadge({ className }: { className?: string }) {
   if (count === 0) return null;
   return (
     <span
-      aria-label={`${count} pending`}
+      aria-label={`${count} waiting on you`}
       className={cn("flex size-5 items-center justify-center rounded-full bg-teal text-[11px] font-bold text-white", className)}
     >
       {count}

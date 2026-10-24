@@ -1,7 +1,7 @@
 "use client";
 
-// Sign-in is a name only. Under the hood it's a Supabase anonymous session (no email, no password),
-// which gives the API a real user id and token so per-user rules work. The session lives in this browser.
+// Sign-in is a name only: POST /auth/name finds the person by name (or creates them) and returns a real
+// Supabase session, which we store so the API gets a token and per-user rules work. No email, no password.
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api, supabase } from "./api";
 import type { MeOut } from "./api-types";
@@ -13,7 +13,7 @@ interface Session {
   signedIn: boolean;
   me: MeOut | null;
   refreshMe: () => Promise<MeOut | null>;
-  /** Creates the anonymous session if needed and saves the name. Returns the fresh profile. */
+  /** Signs in as the person with this name, creating them if new. Returns their profile. */
   signIn: (name: string) => Promise<MeOut>;
   signOut: () => Promise<void>;
 }
@@ -47,21 +47,19 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       });
   }, [refreshMe]);
 
-  const signIn = useCallback(
-    async (name: string) => {
-      const { data } = await supabase().auth.getSession();
-      if (!data.session) {
-        const { error } = await supabase().auth.signInAnonymously();
-        if (error) throw error;
-      }
-      setSignedIn(true);
-      const next = await api<MeOut>("/me", { method: "PATCH", body: { display_name: name.trim() } });
-      setMe(next);
-      invalidate("/");
-      return next;
-    },
-    [],
-  );
+  const signIn = useCallback(async (name: string) => {
+    const session = await api<{ access_token: string; refresh_token: string }>("/auth/name", {
+      method: "POST",
+      body: { name: name.trim() },
+    });
+    const { error } = await supabase().auth.setSession(session);
+    if (error) throw error;
+    setSignedIn(true);
+    invalidate("/");
+    const next = await api<MeOut>("/me");
+    setMe(next);
+    return next;
+  }, []);
 
   const signOut = useCallback(async () => {
     await supabase().auth.signOut();

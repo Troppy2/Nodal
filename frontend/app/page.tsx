@@ -1,11 +1,11 @@
 import { CoverArt } from "@/components/feed/CoverArt";
-import { SignInButton } from "@/components/landing/SignInButton";
+import { SignInButton, SignInForm } from "@/components/landing/SignInButton";
 import { Logo } from "@/components/shell/Logo";
 
 const steps = [
-  { n: "01", title: "Post what you're missing", body: "An idea or a project, and the skills it needs from other disciplines." },
-  { n: "02", title: "Get matched both ways", body: "See who can fill each need, and which projects need what you offer." },
-  { n: "03", title: "Build in swaps and rings", body: "You help them, they help you. Or a ring of three where everyone gets help." },
+  { n: "1", title: "Post what you're missing", body: "An idea or a project, and the skills it needs from other disciplines." },
+  { n: "2", title: "Get matched both ways", body: "See who can fill each need, and which projects need what you offer." },
+  { n: "3", title: "Build in swaps and rings", body: "You help them, they help you. Or a ring of three where everyone gets help." },
 ];
 
 export default function LandingPage() {
@@ -25,8 +25,8 @@ export default function LandingPage() {
             Post what you&apos;re building and what it needs. Nodal matches you with people who have the skill, and spots the trades
             where you can help each other.
           </p>
-          <div className="mt-8">
-            <SignInButton />
+          <div id="sign-in" className="mt-8 scroll-mt-24">
+            <SignInForm />
           </div>
         </section>
 
@@ -39,8 +39,8 @@ export default function LandingPage() {
         <ol className="mx-auto grid max-w-[1100px] gap-8 px-5 py-12 sm:grid-cols-3">
           {steps.map((s) => (
             <li key={s.n}>
-              <p className="font-mono text-[11px] text-teal">{s.n}</p>
-              <h2 className="mt-2 text-lg font-extrabold tracking-tight">{s.title}</h2>
+              <p className="flex size-6 items-center justify-center rounded-full bg-teal-tint text-xs font-bold text-teal">{s.n}</p>
+              <h2 className="mt-3 text-lg font-extrabold tracking-tight">{s.title}</h2>
               <p className="mt-1.5 text-[15px] leading-relaxed text-muted-ink">{s.body}</p>
             </li>
           ))}

@@ -1,124 +1,202 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { CollabButton } from "@/components/CollabDialog";
 import { CoverArt } from "@/components/feed/CoverArt";
 import { Label, ProjectMeta } from "@/components/Meta";
-import { buildGraph } from "@/components/people/graph-data";
+import { layoutPeople } from "@/components/people/graph-data";
 import { GraphLegend, PeopleGraph } from "@/components/people/PeopleGraph";
 import { PersonDetail } from "@/components/people/PersonDetail";
 import { MobileHeader } from "@/components/shell/MobileHeader";
 import { TabStrip } from "@/components/Tabs";
-import { me, type Project } from "@/lib/catalog";
-import { coolFactor, coolSteps, marketRun, marketSteps } from "@/lib/seed-results";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ApiError } from "@/lib/api";
+import type { GraphOut, MatchOut, ProjectDetail, ResearchOut } from "@/lib/api-types";
+import { useSession } from "@/lib/session";
 import { btn } from "@/lib/styles";
+import { useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 import { CoolFactorCard } from "./CoolFactorCard";
 import { ResearchReport } from "./ResearchReport";
+import { EmptyState, ErrorState } from "./States";
+import { type CheckId, useResearch } from "./use-research";
 
-type CheckId = "market" | "cool";
 type MobileTab = "people" | CheckId;
 
-interface Run {
-  status: "idle" | "running" | "done";
-  steps: string[];
-}
+const blurb: Record<CheckId, string> = {
+  market: "Searches the web for competitors and demand, then gives a cited verdict on whether this could be a company.",
+  cool: "Scores novelty, demo appeal, fun to build with others, and weekend-sized scope. Ignores money.",
+};
 
-// The seeded idea already has both checks; anything else starts empty and runs in fixture mode.
-const SEEDED = "soil-choir";
-const STEP_MS = 450;
-
-/** Simulates POST /projects/{id}/research in fixture mode: steps stream in, then the stored report shows. */
-function useCheckRuns(seeded: boolean, title: string) {
-  const done: Run = { status: "done", steps: [] };
-  const idle: Run = { status: "idle", steps: [] };
-  const [runs, setRuns] = useState<Record<CheckId, Run>>({ market: seeded ? done : idle, cool: seeded ? done : idle });
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  useEffect(() => () => timers.current.forEach(clearTimeout), []);
-
-  function start(check: CheckId) {
-    const labels = check === "market" ? marketSteps(title) : coolSteps;
-    setRuns((r) => ({ ...r, [check]: { status: "running", steps: [] } }));
-    labels.forEach((label, i) => {
-      timers.current.push(
-        setTimeout(() => setRuns((r) => ({ ...r, [check]: { status: "running", steps: [...r[check].steps, label] } })), i * STEP_MS),
-      );
-    });
-    timers.current.push(
-      setTimeout(() => setRuns((r) => ({ ...r, [check]: { status: "done", steps: r[check].steps } })), labels.length * STEP_MS + 300),
-    );
-  }
-
-  return { runs, start };
-}
-
-function RunSteps({ steps }: { steps: string[] }) {
+function RunSteps({ run }: { run: ResearchOut }) {
+  const steps = [...run.steps].reverse();
   return (
     <ol className="flex flex-col gap-2 py-2" aria-live="polite">
-      {[...steps].reverse().map((s, i) => (
-        <li key={s} className={cn("flex items-center gap-2 text-sm", i === 0 ? "text-ink" : "text-muted-ink")}>
+      {steps.length === 0 && (
+        <li className="flex items-center gap-2 text-sm">
+          <Loader2 className="size-4 animate-spin" /> Starting
+        </li>
+      )}
+      {steps.map((s, i) => (
+        <li key={`${s.label}-${i}`} className={cn("flex items-center gap-2 text-sm", i === 0 ? "text-ink" : "text-muted-ink")}>
           {i === 0 ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4 text-teal" />}
-          {s}
+          {s.label}
         </li>
       ))}
     </ol>
   );
 }
 
-function CheckBody({ check, run, onRun, sample, own }: { check: CheckId; run: Run; onRun: () => void; sample: boolean; own: boolean }) {
-  if (run.status === "running") return <RunSteps steps={run.steps} />;
-  if (run.status === "idle" && !own) {
-    return <p className="py-2 text-sm text-muted-ink">The owner hasn&apos;t shared a {check === "market" ? "market report" : "cool factor score"} yet.</p>;
-  }
-  if (run.status === "idle") {
+function CheckBody({ check, research, own }: { check: CheckId; research: ReturnType<typeof useResearch>; own: boolean }) {
+  const { run, loading, error, starting, start, reload } = research;
+  if (loading) return <Skeleton className="h-40 rounded-lg" />;
+  if (error) return <ErrorState error={error} onRetry={reload} className="py-6" />;
+  const covers = run?.checks.includes(check);
+  if (run && covers && (run.status === "queued" || run.status === "running")) return <RunSteps run={run} />;
+  if (run && covers && run.status === "failed") {
     return (
-      <div className="flex flex-col items-start gap-3 py-2">
-        <p className="text-sm leading-relaxed text-ink/80">
-          {check === "market"
-            ? "Searches the web for competitors and demand, then gives a cited verdict on whether this could be a company."
-            : "Scores novelty, demo appeal, fun to build with others, and weekend-sized scope. Ignores money."}
-        </p>
-        <button onClick={onRun} className={btn.primary}>
-          {check === "market" ? "Run market check" : "Score cool factor"}
-        </button>
-      </div>
+      <EmptyState
+        title="The check didn't finish"
+        body={run.error ?? "Something went wrong while it ran."}
+        action={
+          own && (
+            <button onClick={() => start(check)} disabled={starting} className={btn.primary}>
+              Try again
+            </button>
+          )
+        }
+        className="py-6"
+      />
     );
   }
-  return check === "market" ? (
-    <ResearchReport report={marketRun.report} sources={marketRun.sources} facts={marketRun.facts} isSample={sample || marketRun.is_sample} />
-  ) : (
-    <CoolFactorCard cool={coolFactor} isSample={sample} />
+  if (run && check === "market" && run.report) return <ResearchReport run={run} />;
+  if (run && check === "cool" && run.cool) return <CoolFactorCard run={run} />;
+  if (!own) {
+    return (
+      <p className="py-2 text-sm text-muted-ink">
+        The owner hasn&apos;t shared a {check === "market" ? "market report" : "cool factor score"} yet.
+      </p>
+    );
+  }
+  return (
+    <div className="flex flex-col items-start gap-3 py-2">
+      <p className="text-sm leading-relaxed text-ink/80">{blurb[check]}</p>
+      <button onClick={() => start(check)} disabled={starting} className={btn.primary}>
+        {starting && <Loader2 className="size-4 animate-spin" />}
+        {check === "market" ? "Run market check" : "Score cool factor"}
+      </button>
+    </div>
   );
 }
 
-/** Checks and people: the People graph beside the chosen checks. Mobile splits them into tabs. */
-export function ResultsView({ project }: { project: Project }) {
-  const seeded = project.id === SEEDED;
-  const own = project.owner.handle === me.handle;
+function PeoplePanel({ project, viewerId, own }: { project: ProjectDetail; viewerId: string | null; own: boolean }) {
+  const graph = useApi<GraphOut>(`/graph/projects/${project.id}?depth=2`);
+  const matches = useApi<MatchOut[]>(`/projects/${project.id}/matches`);
+  const [selected, setSelected] = useState("");
+  const openNeeds = project.needs.filter((n) => n.status === "open").length;
+
+  if (graph.error || matches.error) {
+    return (
+      <ErrorState
+        error={(graph.error ?? matches.error)!}
+        onRetry={() => {
+          graph.reload();
+          matches.reload();
+        }}
+      />
+    );
+  }
+  if (!graph.data || !matches.data) return <Skeleton className="mt-4 aspect-[16/10] w-full rounded-lg" />;
+
+  const { nodes, rings } = layoutPeople(graph.data, matches.data);
+  if (nodes.length === 0) {
+    return (
+      <EmptyState
+        title={openNeeds === 0 ? "No open needs" : "Nobody offers these skills yet"}
+        body={
+          openNeeds === 0
+            ? "Add a need and Nodal finds the people who can fill it."
+            : "New people join every day. Share the project to reach more of them."
+        }
+        action={
+          <Link href={`/projects/${project.id}?tab=needs`} className={btn.secondary}>
+            {openNeeds === 0 && own ? "Add a need" : "See the needs"}
+          </Link>
+        }
+      />
+    );
+  }
+  const node = nodes.find((n) => n.profile.id === selected) ?? nodes[0];
+  return (
+    <>
+      <div className="mt-4">
+        <PeopleGraph center={project.title} nodes={nodes} rings={rings} selected={node.profile.id} viewerId={viewerId} onSelect={setSelected} />
+      </div>
+      <div className="mt-3">
+        <GraphLegend cycles={nodes.some((n) => n.kind)} />
+      </div>
+      <div className="mt-5 border-t border-line pt-5">
+        <PersonDetail node={node} isOwner={own} viewerId={viewerId} />
+      </div>
+    </>
+  );
+}
+
+/** Checks and people: the People graph beside the idea's checks. Mobile splits them into tabs. */
+export function ResultsView({ id }: { id: string }) {
+  const { me } = useSession();
+  const viewerId = me?.profile.id ?? null;
+  const { data: project, error, reload } = useApi<ProjectDetail>(`/projects/${id}`);
+  const own = Boolean(project && viewerId && project.owner.id === viewerId);
   // Market and cool-factor checks exist for ideas only. Projects keep the people side.
-  const isIdea = project.stage === "idea";
-  const { nodes, rings } = buildGraph(project);
+  const isIdea = project?.stage === "idea";
+  const research = useResearch(id, Boolean(isIdea));
   const [check, setCheck] = useState<CheckId>("market");
   const [mobileTab, setMobileTab] = useState<MobileTab>("people");
-  const [selected, setSelected] = useState(nodes[0]?.person.handle ?? "");
-  const { runs, start } = useCheckRuns(seeded, project.title);
-  const node = nodes.find((n) => n.person.handle === selected) ?? nodes[0];
 
-  const finished = (["market", "cool"] as const).filter((c) => runs[c].status === "done").length;
+  if (error) {
+    return error instanceof ApiError && error.status === 404 ? (
+      <EmptyState
+        title="Project not found"
+        body="It may have been deleted, or the link is wrong."
+        action={
+          <Link href="/explore" className={btn.secondary}>
+            Explore projects
+          </Link>
+        }
+        className="py-24"
+      />
+    ) : (
+      <ErrorState error={error} onRetry={reload} className="py-24" />
+    );
+  }
+  if (!project) {
+    return (
+      <div className="mx-auto max-w-[1120px] px-4 py-7 lg:px-8" aria-busy="true" aria-label="Loading">
+        <Skeleton className="h-14 w-72 rounded-lg" />
+        <Skeleton className="mt-6 h-96 rounded-xl" />
+      </div>
+    );
+  }
+
+  const run = research.run;
+  const done = (["market", "cool"] as const).filter((c) => (c === "market" ? run?.report : run?.cool)).length;
+  const fit = project.people_fit;
   const status = !isIdea
-    ? `${nodes.length} ${nodes.length === 1 ? "person fits" : "people fit"}`
-    : finished === 2
+    ? `${fit} ${fit === 1 ? "person fits" : "people fit"}`
+    : done === 2
       ? "Both checks finished"
-      : finished === 1
+      : done === 1
         ? "One check finished"
         : "No checks run yet";
   const shownTab: MobileTab = isIdea ? mobileTab : "people";
+  const openNeeds = project.needs.filter((n) => n.status === "open").length;
 
   const primary = own ? (
     <Link href={`/projects/${project.id}/team`} className={btn.primary}>
-      Start building
+      {isIdea ? "Start building" : "Team"}
     </Link>
   ) : (
     <CollabButton project={project} />
@@ -148,7 +226,7 @@ export function ResultsView({ project }: { project: Project }) {
             <h1 className="text-2xl font-extrabold tracking-tight">{project.title}</h1>
             <ProjectMeta project={project} className="mt-1" />
           </div>
-          <Label className="mr-2">{status}</Label>
+          <p className="mr-2 text-[13px] text-muted-ink">{status}</p>
           <Link href={`/projects/${project.id}`} className={btn.secondary}>
             View post
           </Link>
@@ -160,38 +238,24 @@ export function ResultsView({ project }: { project: Project }) {
             aria-labelledby="people-title"
             className={cn("px-4 py-5 lg:block lg:rounded-xl lg:border lg:border-line lg:p-5", shownTab !== "people" && "hidden")}
           >
-            <div className="flex items-baseline justify-between">
+            <div className="flex items-baseline justify-between gap-3">
               <h2 id="people-title" className="text-[15px] font-bold">
                 People who fit
               </h2>
               <Label>
-                {nodes.length} {nodes.length === 1 ? "person" : "people"} · {project.needs.length} open{" "}
-                {project.needs.length === 1 ? "need" : "needs"}
+                {openNeeds} open {openNeeds === 1 ? "need" : "needs"}
               </Label>
             </div>
-            {nodes.length === 0 ? (
-              <p className="py-12 text-center text-sm text-muted-ink">
-                {project.needs.length === 0 ? "This project has no open needs." : "Nobody offers these skills yet. New people join every day."}
-              </p>
-            ) : (
-              <>
-                <div className="mt-4">
-                  <PeopleGraph center={project.title} nodes={nodes} rings={rings} selected={node.person.handle} onSelect={setSelected} />
-                </div>
-                <div className="mt-3">
-                  <GraphLegend cycles={nodes.some((n) => n.kind)} />
-                </div>
-                <div className="mt-5 border-t border-line pt-5">
-                  <PersonDetail node={node} canInvite={own} />
-                </div>
-              </>
-            )}
+            <PeoplePanel project={project} viewerId={viewerId} own={own} />
           </section>
 
           {isIdea && (
             <section
               aria-label="Checks"
-              className={cn("focus-inset px-4 py-5 lg:block lg:overflow-hidden lg:rounded-xl lg:border lg:border-line lg:p-0", shownTab === "people" && "hidden")}
+              className={cn(
+                "focus-inset px-4 py-5 lg:block lg:overflow-hidden lg:rounded-xl lg:border lg:border-line lg:p-0",
+                shownTab === "people" && "hidden",
+              )}
             >
               <TabStrip<CheckId>
                 fill
@@ -204,13 +268,25 @@ export function ResultsView({ project }: { project: Project }) {
                 className="hidden lg:flex [&>button]:text-sm"
               />
               {(["market", "cool"] as const).map((c) => (
-                <div
-                  key={c}
-                  className={cn("lg:p-5", shownTab === c ? "block" : "hidden", check === c ? "lg:block" : "lg:hidden")}
-                >
-                  <CheckBody check={c} run={runs[c]} onRun={() => start(c)} sample={!seeded} own={own} />
+                <div key={c} className={cn("lg:p-5", shownTab === c ? "block" : "hidden", check === c ? "lg:block" : "lg:hidden")}>
+                  <CheckBody check={c} research={research} own={own} />
                 </div>
               ))}
+              {own && run && (run.report || run.cool) && (
+                <label className="flex cursor-pointer items-center justify-between gap-3 border-t border-line py-4 text-sm lg:px-5">
+                  <span>
+                    <span className="font-semibold">Show on idea page</span>
+                    <span className="block text-[13px] text-muted-ink">Anyone who opens the idea can read these checks.</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={run.is_public}
+                    onChange={(e) => research.setPublic(e.target.checked)}
+                    className="size-5 cursor-pointer accent-teal"
+                  />
+                </label>
+              )}
             </section>
           )}
         </div>

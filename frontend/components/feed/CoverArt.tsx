@@ -1,5 +1,5 @@
 import { tints } from "@/lib/cover";
-import type { Cover, CoverPattern } from "@/lib/types";
+import type { Cover, CoverPattern } from "@/lib/api-types";
 import { cn } from "@/lib/utils";
 
 // Deterministic per-project variation: the pattern and tint come from the API,
@@ -33,14 +33,26 @@ function Shapes({ pattern, color, seed }: { pattern: CoverPattern; color: string
       );
     }
     case "bars": {
-      const n = 9 + Math.floor(r() * 6);
-      const w = 300 / n;
-      let h = 40 + r() * 40;
+      // Rounded pills on a baseline: reads as sound, not a bar chart.
+      const n = 7 + Math.floor(r() * 4);
+      const gap = 12;
+      const w = (280 - gap * (n - 1)) / n;
+      let h = 50 + r() * 40;
       return (
         <g fill={color}>
           {Array.from({ length: n }, (_, i) => {
-            h = Math.max(24, Math.min(210, h + (r() - 0.35) * 60));
-            return <rect key={i} x={50 + i * w} y={240 - h} width={w - 5} height={h} opacity={0.35 + (i / n) * 0.65} />;
+            h = Math.max(30, Math.min(140, h + (r() - 0.42) * 46));
+            return (
+              <rect
+                key={i}
+                x={60 + i * (w + gap)}
+                y={190 - h}
+                width={w}
+                height={h}
+                rx={w / 2}
+                opacity={0.4 + (i / Math.max(1, n - 1)) * 0.6}
+              />
+            );
           })}
         </g>
       );

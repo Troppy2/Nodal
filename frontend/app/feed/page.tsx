@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { Send, SquarePlus } from "lucide-react";
+import { Composer } from "@/components/feed/Composer";
 import { FeedTabs } from "@/components/feed/FeedTabs";
 import { SideSuggestions } from "@/components/feed/SideSuggestions";
 import { StoryRow } from "@/components/feed/StoryRow";
-import { Logo } from "@/components/shell/Logo";
 import { InboxBadge } from "@/components/shell/InboxBadge";
+import { Logo } from "@/components/shell/Logo";
 import { OnboardingPrompt } from "@/components/shell/OnboardingPrompt";
 
 export default function FeedPage() {
@@ -22,13 +23,24 @@ export default function FeedPage() {
           </Link>
         </div>
       </header>
-      <div className="mx-auto flex max-w-[1000px] justify-center gap-12 lg:px-6 lg:py-4">
-        <div className="w-full min-w-0 max-w-[580px]">
-          <OnboardingPrompt />
-          <StoryRow />
-          <FeedTabs />
+
+      <div className="mx-auto w-full max-w-[1040px] lg:px-8">
+        <div className="lg:grid lg:grid-cols-[minmax(0,600px)_300px] lg:justify-center lg:gap-10">
+          <div className="min-w-0">
+            <div className="hidden pb-4 pt-7 lg:block">
+              <h1 className="text-[22px] font-extrabold tracking-[-0.02em]">Home</h1>
+              <p className="mt-0.5 text-[13px] text-muted-ink">What people are building right now</p>
+            </div>
+
+            <OnboardingPrompt />
+            <Composer />
+            <StoryRow />
+            <div className="mt-2 lg:mt-4">
+              <FeedTabs />
+            </div>
+          </div>
+          <SideSuggestions />
         </div>
-        <SideSuggestions />
       </div>
     </>
   );

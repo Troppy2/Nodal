@@ -213,3 +213,27 @@ def test_project_links_must_be_http(client, new_user):
     assert r.status_code == 201
     pid = r.json()["id"]
     assert client.patch(f"/api/v1/projects/{pid}", json={"demo_url": "data:text/html,x"}, headers=u["headers"]).status_code == 422
+
+
+def test_sign_in_with_name_finds_existing_and_creates_new(client):
+    r = client.post("/api/v1/auth/name", json={"name": "Maya Okafor"})
+    assert r.status_code == 200 and r.json()["created"] is False
+    me = client.get("/api/v1/me", headers={"Authorization": f"Bearer {r.json()['access_token']}"}).json()
+    assert me["profile"]["handle"] == "maya"
+    assert client.post("/api/v1/auth/name", json={"name": "maya"}).json()["user_id"] == r.json()["user_id"]
+
+    new = client.post("/api/v1/auth/name", json={"name": "Zed Testerson"})
+    assert new.status_code == 200 and new.json()["created"] is True
+    again = client.post("/api/v1/auth/name", json={"name": "zed testerson"})
+    assert again.json()["user_id"] == new.json()["user_id"] and again.json()["created"] is False
+    from app.db import service_client
+    service_client().auth.admin.delete_user(new.json()["user_id"])
+    assert client.post("/api/v1/auth/name", json={"name": "   "}).status_code == 422
+
+
+def test_sign_in_name_wildcards_do_not_match_others(client):
+    from app.db import service_client
+    for pattern in ["%", "*", "M*", "_aya*"]:
+        r = client.post("/api/v1/auth/name", json={"name": pattern})
+        assert r.status_code == 200 and r.json()["created"] is True, pattern
+        service_client().auth.admin.delete_user(r.json()["user_id"])

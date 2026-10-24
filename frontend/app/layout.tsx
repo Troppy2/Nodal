@@ -3,7 +3,7 @@ import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/shell/AppShell";
 import { Toaster } from "@/components/ui/sonner";
-import { DemoStoreProvider } from "@/lib/store";
+import { SessionProvider } from "@/lib/session";
 
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
@@ -26,9 +26,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <body className={`${jakarta.variable} ${jetbrains.variable} bg-white font-sans text-ink antialiased`}>
-        <DemoStoreProvider>
+        <SessionProvider>
           <AppShell>{children}</AppShell>
-        </DemoStoreProvider>
+        </SessionProvider>
         <Toaster position="bottom-center" />
       </body>
     </html>
