@@ -417,3 +417,16 @@ class SourceFileOut(BaseModel):
 
 
 CollabOut.model_rebuild()
+
+
+class IdeaSuggestion(BaseModel):
+    """LLM starting points, not validated demand."""
+    id: str
+    title: str
+    pitch: str
+    why_you: str
+    skills: list[Skill]
+    tags: list[str]
+    dismissed: bool
+    posted_project_id: str | None = None
+    created_at: str

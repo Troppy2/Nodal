@@ -15,7 +15,7 @@ from pathlib import Path
 from app.db import service_client
 from app.services.source_service import ingest
 
-from .seed_data import COMMENTS, FOLLOWS, PEOPLE, PROJECTS, SKILLS, STARS
+from .seed_data import COMMENTS, FOLLOWS, GENERATED, GENERATED_FOLLOWS, PEOPLE, PROJECTS, SKILLS, STARS
 
 NS = uuid.UUID("6f1c2a52-8f0e-4c7e-9a43-0b7d6f3e2c11")
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
@@ -35,10 +35,10 @@ def seed_skills(sb) -> dict[str, int]:
     return {r["name"]: r["id"] for r in sb.table("skills").select("id,name").execute().data}
 
 
-def seed_people(sb, skill_ids: dict[str, int]) -> dict[str, str]:
+def seed_people(sb, skill_ids: dict[str, int], people: dict = PEOPLE) -> dict[str, str]:
     existing = {u.id for u in sb.auth.admin.list_users(page=1, per_page=1000)}
     ids = {}
-    for handle, (name, bio, interests, balance, offer_list) in PEOPLE.items():
+    for handle, (name, bio, interests, balance, offer_list) in people.items():
         pid = uid("profile", handle)
         ids[handle] = pid
         if pid not in existing:
@@ -61,7 +61,7 @@ def seed_projects(sb, skill_ids: dict[str, int], people: dict[str, str]) -> dict
         proj_id = uid("project", slug)
         ids[slug] = proj_id
         sb.table("projects").upsert({
-            "id": proj_id, "owner_id": people[p["owner"]], "type": p["type"], "title": p["title"],
+            "id": proj_id, "slug": slug, "owner_id": people[p["owner"]], "type": p["type"], "title": p["title"],
             "summary": p["summary"], "readme_md": p.get("readme"), "stage": p["stage"],
             "source_access": p.get("source", "none"),
         }).execute()
@@ -81,7 +81,7 @@ def seed_projects(sb, skill_ids: dict[str, int], people: dict[str, str]) -> dict
 
 def seed_social(sb, people: dict[str, str], projects: dict[str, str]) -> None:
     sb.table("follows").upsert(
-        [{"follower_id": people[a], "followee_id": people[b]} for a, b in FOLLOWS]
+        [{"follower_id": people[a], "followee_id": people[b]} for a, b in FOLLOWS + GENERATED_FOLLOWS]
     ).execute()
     sb.table("project_stars").upsert(
         [{"profile_id": people[h], "project_id": projects[s]} for h, s in STARS]
@@ -150,11 +150,12 @@ def main() -> None:
     sb = service_client()
     skill_ids = seed_skills(sb)
     people = seed_people(sb, skill_ids)
+    people |= seed_people(sb, skill_ids, GENERATED)
     projects = seed_projects(sb, skill_ids, people)
     seed_social(sb, people, projects)
     seed_research(sb, people, projects)
     seed_source(projects)
-    print(f"Seeded {len(skill_ids)} skills, {len(people)} people, {len(projects)} projects.")
+    print(f"Seeded {len(skill_ids)} skills, {len(people)} people ({len(GENERATED)} generated), {len(projects)} projects.")
 
 
 if __name__ == "__main__":
