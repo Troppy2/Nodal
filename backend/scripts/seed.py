@@ -9,13 +9,15 @@ import json
 import re
 import zipfile
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from app.db import service_client
 from app.services.source_service import ingest
 
-from .seed_data import COMMENTS, FOLLOWS, GENERATED, GENERATED_FOLLOWS, PEOPLE, PROJECTS, SKILLS, STARS
+from .seed_data import (COLLAB_REQUESTS, COMMENTS, CONTRIBUTORS, FOLLOWS,
+                        GENERATED, GENERATED_FOLLOWS, MESSAGES, PEOPLE,
+                        PROJECTS, SKILLS, STARS)
 
 NS = uuid.UUID("6f1c2a52-8f0e-4c7e-9a43-0b7d6f3e2c11")
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
@@ -92,6 +94,60 @@ def seed_social(sb, people: dict[str, str], projects: dict[str, str]) -> None:
     ]).execute()
 
 
+def seed_contributors(sb, skill_ids: dict[str, int], people: dict[str, str], projects: dict[str, str]) -> None:
+    """Add contributors to projects so the team tabs and collaboration stats are populated."""
+    rows = []
+    for handle, slug, skill_name in CONTRIBUTORS:
+        rows.append({
+            "project_id": projects[slug],
+            "profile_id": people[handle],
+            "role": "contributor",
+            "skill_id": skill_ids.get(skill_name),
+            "share_bps": None,
+            "status": "joined",
+        })
+    sb.table("project_members").upsert(rows).execute()
+
+
+def seed_collab_requests(sb, skill_ids: dict[str, int], people: dict[str, str], projects: dict[str, str]) -> None:
+    """Seed collab requests so the inbox has content."""
+    rows = []
+    for i, (handle, slug, skill_name, message, status) in enumerate(COLLAB_REQUESTS):
+        rows.append({
+            "id": uid("collab", f"{handle}:{slug}:{skill_name}"),
+            "project_id": projects[slug],
+            "from_profile_id": people[handle],
+            "skill_id": skill_ids[skill_name],
+            "message": message,
+            "status": status,
+        })
+    sb.table("collab_requests").upsert(rows).execute()
+
+
+def seed_messages(sb, people: dict[str, str], projects: dict[str, str]) -> None:
+    """Seed direct messages so the inbox/conversations feel lived-in."""
+    now = datetime.now(timezone.utc)
+    total = len(MESSAGES)
+    rows = []
+    for i, (from_h, to_h, proj_slug, kind, body) in enumerate(MESSAGES):
+        # Space messages out over the last 14 days, oldest first
+        offset = timedelta(days=14) - timedelta(minutes=(total - i) * 45)
+        created = (now + offset).isoformat()
+        # Mark older messages as read (all except the last 5)
+        read_at = created if i < total - 5 else None
+        rows.append({
+            "id": uid("message", f"{from_h}:{to_h}:{i}"),
+            "from_profile_id": people[from_h],
+            "to_profile_id": people[to_h],
+            "project_id": projects.get(proj_slug),
+            "kind": kind,
+            "body": body,
+            "read_at": read_at,
+            "created_at": created,
+        })
+    sb.table("messages").upsert(rows).execute()
+
+
 def seed_research(sb, people: dict[str, str], projects: dict[str, str]) -> None:
     """The demo idea's checks, stored so the demo never waits on the network. Labeled as a sample."""
     fixture = json.loads((FIXTURES / "research_report.json").read_text(encoding="utf-8"))
@@ -153,9 +209,14 @@ def main() -> None:
     people |= seed_people(sb, skill_ids, GENERATED)
     projects = seed_projects(sb, skill_ids, people)
     seed_social(sb, people, projects)
+    seed_contributors(sb, skill_ids, people, projects)
+    seed_collab_requests(sb, skill_ids, people, projects)
+    seed_messages(sb, people, projects)
     seed_research(sb, people, projects)
     seed_source(projects)
     print(f"Seeded {len(skill_ids)} skills, {len(people)} people ({len(GENERATED)} generated), {len(projects)} projects.")
+    print(f"  + {len(CONTRIBUTORS)} contributors, {len(COLLAB_REQUESTS)} collab requests, {len(MESSAGES)} messages")
+    print(f"  + {len(FOLLOWS)} follows, {len(STARS)} stars, {len(COMMENTS)} comments")
 
 
 if __name__ == "__main__":
