@@ -229,3 +229,10 @@ def test_sign_in_with_name_finds_existing_and_creates_new(client):
     from app.db import service_client
     service_client().auth.admin.delete_user(new.json()["user_id"])
     assert client.post("/api/v1/auth/name", json={"name": "   "}).status_code == 422
+
+
+def test_sign_in_name_wildcards_do_not_match_others(client):
+    r = client.post("/api/v1/auth/name", json={"name": "%"})
+    assert r.status_code == 200 and r.json()["created"] is True
+    from app.db import service_client
+    service_client().auth.admin.delete_user(r.json()["user_id"])

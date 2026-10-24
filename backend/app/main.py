@@ -1,13 +1,18 @@
 from fastapi import FastAPI
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
+from .limits import limiter
 from .routers import (
     auth, collab, comments, feed, graph, inbox, matches, me, profiles, projects, recommendations, research,
     skills, social, source, team, tolken,
 )
 
 app = FastAPI(title="Nodal API")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.frontend_origin],

@@ -9,11 +9,12 @@ import re
 import uuid
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from ..config import settings
 from ..db import service_client
+from ..limits import limiter
 
 router = APIRouter()
 
@@ -43,16 +44,20 @@ def _find_profile(name: str) -> dict | None:
     by_handle = sb.table("profiles").select("id,handle").eq("handle", _slug(name)).limit(1).execute().data
     if by_handle:
         return by_handle[0]
-    by_name = sb.table("profiles").select("id,handle").ilike("display_name", name).order("created_at").limit(1).execute().data
+    # Escape LIKE wildcards so "%" or "_" can't match someone else's name.
+    literal = name.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
+    by_name = sb.table("profiles").select("id,handle").ilike("display_name", literal).order("created_at").limit(1).execute().data
     return by_name[0] if by_name else None
 
 
 def _unique_handle(base: str) -> str:
     sb = service_client()
-    handle, n = base, 2
-    while sb.table("profiles").select("id").eq("handle", handle).execute().data:
-        handle, n = f"{base}-{n}", n + 1
-    return handle
+    handle = base
+    for n in range(2, 50):
+        if not sb.table("profiles").select("id").eq("handle", handle).execute().data:
+            return handle
+        handle = f"{base}-{n}"
+    return f"{base}-{uuid.uuid4().hex[:6]}"
 
 
 def _create_user(name: str) -> str:
@@ -85,7 +90,10 @@ def _session_for(user_id: str) -> dict:
 
 
 @router.post("/auth/name", response_model=SessionOut)
-def sign_in_with_name(body: NameIn):
+@limiter.limit("20/minute")
+def sign_in_with_name(request: Request, body: NameIn):
+    if not settings.name_signin_enabled:
+        raise HTTPException(404, "Not found")
     name = " ".join(body.name.split())
     if not name:
         raise HTTPException(422, "Enter your name")
