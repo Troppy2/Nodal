@@ -1,6 +1,7 @@
 """Unit tests that need no Supabase: rate limits, slug rewriting, idea suggestions with a fake LLM."""
 
 import time
+from types import SimpleNamespace
 
 import jwt
 from fastapi import Depends, FastAPI
@@ -31,9 +32,9 @@ def test_rate_limit_per_user():
 
 
 def test_slug_middleware_rewrites_projects_and_follow(monkeypatch):
-    found = {("projects", "plant-monitor"): "11111111-1111-1111-1111-111111111111",
-             ("profiles", "maya"): "22222222-2222-2222-2222-222222222222"}
-    monkeypatch.setattr(slugs, "_lookup", lambda table, col, value: found.get((table, value)))
+    fake = SimpleNamespace(by_slug={"plant-monitor": "11111111-1111-1111-1111-111111111111"},
+                           by_handle={"maya": "22222222-2222-2222-2222-222222222222"})
+    monkeypatch.setattr(slugs, "world", lambda: fake)
     app = FastAPI()
     app.add_middleware(slugs.SlugMiddleware)
 
@@ -53,3 +54,59 @@ def test_slug_middleware_rewrites_projects_and_follow(monkeypatch):
 def test_slugify():
     assert slugs.slugify("Park&Go!  v2") == "park-go-v2"
     assert slugs.slugify("???") == "project"
+
+
+def test_database_errors_become_clear_statuses():
+    from postgrest.exceptions import APIError
+
+    from app import errors
+
+    app = FastAPI()
+    errors.install(app)
+
+    @app.get("/dup")
+    def dup():
+        raise APIError({"message": "duplicate key", "code": "23505", "hint": None, "details": None})
+
+    @app.get("/odd")
+    def odd():
+        raise APIError({"message": "something else", "code": "XX000", "hint": None, "details": None})
+
+    c = TestClient(app)
+    assert c.get("/dup").status_code == 409 and c.get("/dup").json() == {"detail": "That already exists"}
+    assert c.get("/odd").status_code == 502
+
+
+def test_writes_invalidate_the_world(monkeypatch):
+    from app import main
+
+    calls = []
+    monkeypatch.setattr(main, "invalidate", lambda: calls.append(1))
+    app = FastAPI()
+    app.add_middleware(main.InvalidateOnWrite)
+
+    @app.api_route("/x", methods=["GET", "POST", "DELETE"])
+    def x():
+        return {}
+
+    c = TestClient(app)
+    c.get("/x")
+    assert calls == []
+    c.post("/x")
+    c.delete("/x")
+    assert calls == [1, 1]
+
+
+def test_world_reload_waits_for_invalidate(monkeypatch):
+    from app import world as world_mod
+
+    loads = []
+    monkeypatch.setattr(world_mod, "_load", lambda: loads.append(1) or SimpleNamespace(loaded_at=time.monotonic()))
+    world_mod.invalidate()
+    world_mod.world()
+    world_mod.world()
+    assert len(loads) == 1                      # cached between writes
+    world_mod.invalidate()
+    world_mod.world()
+    assert len(loads) == 2
+    world_mod.invalidate()                      # leave no fake world behind for other tests

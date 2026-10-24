@@ -13,6 +13,7 @@ from pathlib import Path
 
 from ..config import settings
 from ..db import service_client
+from ..world import invalidate
 from . import research_pipeline as pipeline
 from .llm import LLMError, llm_json
 from .webresearch import TinyFishWebResearch
@@ -75,6 +76,8 @@ def run_fixture(run_id: str, checks: list[str]) -> None:
         }).eq("id", run_id).execute()
     except Exception as exc:  # keep the run readable instead of stuck in "running"
         sb.table("research_runs").update({"status": "failed", "error": str(exc)[:200]}).eq("id", run_id).execute()
+    finally:
+        invalidate()        # badges on cards come from the world
 
 
 def run_live(run_id: str, project: dict, checks: list[str], web=None, llm=None) -> None:
@@ -135,6 +138,8 @@ def run_live(run_id: str, project: dict, checks: list[str], web=None, llm=None) 
         write({"status": status, "finished_at": now(), "error": "; ".join(errors)[:200] or None})
     except Exception as exc:  # keep the run readable instead of stuck in "running"
         write({"status": "failed", "finished_at": now(), "error": str(exc)[:200]})
+    finally:
+        invalidate()        # badges on cards come from the world
 
 
 def serialize(run: dict) -> dict:

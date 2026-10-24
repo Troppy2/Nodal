@@ -1,14 +1,18 @@
 """Tolken bounties (docs/BACKEND.md "Tolken"). Tolken is the in-app currency; no money moves anywhere.
 
-Every status change is a conditional update (`... where status = <from>`), so two concurrent calls
-cannot both win, and a balance can never go negative (profiles has a check constraint)."""
+A bounty's ledger row moves pending_funding -> funded -> released, or ends cancelled (never funded) or
+refunded (funded, then called off). Each move is a conditional update (`... where status = <from>`),
+so of two concurrent calls only one wins, and balances can't go negative (profiles has a check constraint).
+Always read live: this never goes through the world cache.
+"""
 
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
 
-from ..db import service_client
+from ..db import parallel, service_client
 
+FULL_SHARES = 10000
 TRANSITIONS = {
     "pending_funding": {"funded", "cancelled"},
     "funded": {"released", "refunded"},
@@ -21,12 +25,11 @@ def check_transition(current: str, target: str) -> None:
 
 
 def _move(entry_id: str, current: str, target: str) -> dict:
-    """Claim the transition. Returns the updated row, or 409 if someone else changed it first."""
+    """Claim the transition; 409 if another request moved the row first."""
     check_transition(current, target)
-    rows = (
-        service_client().table("tolken_ledger").update({"status": target, "updated_at": datetime.now(timezone.utc).isoformat()})
-        .eq("id", entry_id).eq("status", current).execute().data
-    )
+    rows = (service_client().table("tolken_ledger")
+            .update({"status": target, "updated_at": datetime.now(timezone.utc).isoformat()})
+            .eq("id", entry_id).eq("status", current).execute().data)
     if not rows:
         raise HTTPException(409, "This bounty changed while you were acting on it. Refresh and try again.")
     return rows[0]
@@ -41,52 +44,52 @@ def balance(profile_id: str) -> int:
     return rows[0]["tolken_balance"] if rows else 0
 
 
-def shares_total(project_id: str) -> int:
-    rows = service_client().table("project_members").select("share_bps").eq("project_id", project_id).eq("status", "joined").execute().data
-    return sum(r["share_bps"] or 0 for r in rows)
+def _joined_members(project_id: str) -> list[dict]:
+    return (service_client().table("project_members").select("profile_id,share_bps")
+            .eq("project_id", project_id).eq("status", "joined").execute().data)
 
 
 def fund(entry: dict) -> dict:
-    """pending_funding -> funded, deducting from the owner's balance."""
-    if entry["status"] != "pending_funding":
-        check_transition(entry["status"], "funded")
-    if shares_total(entry["project_id"]) != 10000:
+    """pending_funding -> funded, taking the amount from the owner's balance."""
+    check_transition(entry["status"], "funded")
+    members, owner_balance = parallel(lambda: _joined_members(entry["project_id"]), lambda: balance(entry["owner_id"]))
+    if sum(m["share_bps"] or 0 for m in members) != FULL_SHARES:
         raise HTTPException(409, "Team shares must total 100% before you fund a bounty")
-    if balance(entry["owner_id"]) < entry["amount_tolken"]:
+    if owner_balance < entry["amount_tolken"]:
         raise HTTPException(409, "Not enough Tolken to fund this bounty")
     row = _move(entry["id"], "pending_funding", "funded")
     try:
         _credit(entry["owner_id"], -entry["amount_tolken"])
     except Exception:
-        # balance dropped between the check and the debit (check constraint): undo the claim
-        service_client().table("tolken_ledger").update({"status": "pending_funding"}).eq("id", entry["id"]).eq("status", "funded").execute()
+        # the balance dropped between the check and the debit (check constraint fired): give the claim back
+        service_client().table("tolken_ledger").update({"status": "pending_funding"}) \
+            .eq("id", entry["id"]).eq("status", "funded").execute()
         raise HTTPException(409, "Not enough Tolken to fund this bounty")
     return row
 
 
 def release(entry: dict) -> dict:
-    """funded -> released. The contributor gets the bounty; with no contributor it splits by joined
-    members' shares (floor each, remainder to the owner). Claimed first, so a second call is 409."""
+    """funded -> released. The contributor gets the bounty; with no contributor it is split by joined
+    members' shares (each rounded down, remainder to the owner)."""
     check_transition(entry["status"], "released")
     row = _move(entry["id"], "funded", "released")
     amount = entry["amount_tolken"]
     if entry.get("contributor_id"):
         _credit(entry["contributor_id"], amount)
         return row
-    members = service_client().table("project_members").select("profile_id,share_bps").eq("project_id", entry["project_id"]).eq("status", "joined").execute().data
     paid = 0
-    for m in members:
-        cut = amount * (m["share_bps"] or 0) // 10000
+    for m in _joined_members(entry["project_id"]):
+        cut = amount * (m["share_bps"] or 0) // FULL_SHARES
         if cut and m["profile_id"] != entry["owner_id"]:
             _credit(m["profile_id"], cut)
             paid += cut
-    if amount - paid:
+    if amount > paid:
         _credit(entry["owner_id"], amount - paid)
     return row
 
 
 def cancel(entry: dict) -> dict:
-    """pending_funding -> cancelled; funded -> refunded (Tolken goes back to the owner); released -> 409."""
+    """pending_funding -> cancelled; funded -> refunded (Tolken back to the owner); anything else 409."""
     if entry["status"] == "pending_funding":
         return _move(entry["id"], "pending_funding", "cancelled")
     if entry["status"] == "funded":

@@ -80,26 +80,35 @@ def read_zip(data: bytes) -> tuple[list[tuple[str, bytes]], int]:
     return files, skipped
 
 
+def _chunks(rows: list, size: int = 200):
+    for i in range(0, len(rows), size):
+        yield rows[i:i + size]
+
+
 def ingest(project_id: str, data: bytes) -> dict:
-    """Replace a project's source with this zip. Returns {file_count, skipped_count}."""
+    """Replace a project's source with this zip. Returns {file_count, skipped_count}.
+    Rows are written in batches: a few requests per upload instead of two per file."""
     files, skipped = read_zip(data)
     sb = service_client()
     sb.table("source_files").delete().eq("project_id", project_id).execute()
 
+    texts: dict[str, str] = {}
     text_budget = TEXT_TOTAL_MAX
     for path, content in sorted(files):
-        text = None
         if len(content) < TEXT_MAX and len(content) <= text_budget:
             try:
-                text = content.decode("utf-8")
+                texts[path] = content.decode("utf-8")
+                text_budget -= len(content)
             except UnicodeDecodeError:
-                text = None
-        row = sb.table("source_files").insert(
-            {"project_id": project_id, "path": path, "size_bytes": len(content), "is_text": text is not None}
-        ).execute().data[0]
-        if text is not None:
-            text_budget -= len(content)
-            sb.table("source_contents").insert({"file_id": row["id"], "content": text}).execute()
+                pass
+    file_rows = [{"project_id": project_id, "path": path, "size_bytes": len(content), "is_text": path in texts}
+                 for path, content in sorted(files)]
+    ids: dict[str, str] = {}
+    for chunk in _chunks(file_rows):
+        ids.update({r["path"]: r["id"] for r in sb.table("source_files").insert(chunk).execute().data})
+    contents = [{"file_id": ids[path], "content": text} for path, text in texts.items()]
+    for chunk in _chunks(contents, 50):          # text rows can be large; keep request bodies modest
+        sb.table("source_contents").insert(chunk).execute()
 
     _ensure_bucket(sb)
     key = f"{project_id}/source.zip"
@@ -117,7 +126,7 @@ def remove(project_id: str) -> None:
     try:
         sb.storage.from_(BUCKET).remove([f"{project_id}/source.zip"])
     except Exception:
-        pass
+        pass        # nothing stored yet, or the bucket is missing: the rows below are what readers see
     sb.table("projects").update({"source_zip_path": None, "source_size_bytes": None, "source_uploaded_at": None}) \
         .eq("id", project_id).execute()
 

@@ -1,11 +1,12 @@
 from fastapi import APIRouter
 
-from ..db import service_client
 from ..models import Skill
+from ..world import world
 
 router = APIRouter()
 
 
 @router.get("/skills", response_model=list[Skill])
 def list_skills():
-    return service_client().table("skills").select("*").order("category").order("name").execute().data
+    """The skill taxonomy, by category then name."""
+    return sorted(world().skills.values(), key=lambda s: (s["category"], s["name"]))

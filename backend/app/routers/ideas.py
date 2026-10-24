@@ -10,9 +10,9 @@ from pydantic import BaseModel, Field
 from ..db import service_client
 from ..deps import get_current_user
 from ..models import IdeaSuggestion, NeedIn, ProjectDetail, ProjectIn
-from ..services.cards import skill_out, skills_by_id
+from ..services.cards import skill_out
 from ..services.llm import LLMError, llm_json
-from ..services.matching import Snapshot
+from ..world import world
 from .projects import create_project
 
 router = APIRouter()
@@ -52,16 +52,16 @@ def generate(user: dict = Depends(get_current_user)):
     if len(made) >= PER_DAY * 3:
         raise HTTPException(429, f"You can generate ideas {PER_DAY} times a day. Try again tomorrow.")
 
-    snap = Snapshot.load()
-    skills = snap.skills
-    mine = snap.offers.get(user["id"], {})
-    open_needs = Counter(n["skill_id"] for n in snap.needs).most_common(10)
-    trending = Counter(t for tags in snap.tags.values() for t in tags).most_common(10)
+    w = world()
+    skills = w.skills
+    mine = w.offers.get(user["id"], {})
+    open_needs = Counter(n["skill_id"] for n in w.open_needs).most_common(10)
+    trending = Counter(t for tags in w.tags.values() for t in tags).most_common(10)
     taxonomy = "\n".join(f"{s['id']}: {s['name']} ({s['category']})" for s in skills.values())
     my_skills = ", ".join(f"{skills[s]['name']} (level {lvl})" for s, lvl in mine.items() if s in skills)
     prompt = (
         f"My skills: {my_skills or 'none yet'}\n"
-        f"My interests: {', '.join(sorted(snap.interests.get(user['id'], set()))) or 'none yet'}\n"
+        f"My interests: {', '.join(sorted(w.interests.get(user['id'], set()))) or 'none yet'}\n"
         f"Most needed skills on the platform: {', '.join(skills[s]['name'] for s, _ in open_needs)}\n"
         f"Trending tags: {', '.join(t for t, _ in trending)}\n\nSkill taxonomy (id: name):\n{taxonomy}\n\n"
         "Propose exactly 3 small project ideas I could start with people from other disciplines. pitch is 1 to 2 "
@@ -86,7 +86,7 @@ def generate(user: dict = Depends(get_current_user)):
 def list_suggestions(user: dict = Depends(get_current_user)):
     rows = service_client().table("idea_suggestions").select("*").eq("profile_id", user["id"]) \
         .eq("dismissed", False).order("created_at", desc=True).limit(30).execute().data
-    skills = skills_by_id()
+    skills = world().skills
     return [_out(r, skills) for r in rows]
 
 
@@ -95,7 +95,7 @@ def post_suggestion(suggestion_id: str, user: dict = Depends(get_current_user)):
     s = _own(suggestion_id, user)
     if s["posted_project_id"]:
         raise HTTPException(409, "This suggestion is already posted")
-    skills = skills_by_id()
+    skills = world().skills
     cats = Counter(skills[i]["category"] for i in s["skill_ids"] if i in skills)
     readme = f"# {s['title']}\n\n{s['pitch']}\n\n## Why me\n\n{s['why_you']}\n"
     project = create_project(ProjectIn(

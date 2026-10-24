@@ -11,6 +11,7 @@ from app.config import settings
 from app.db import service_client
 from app.main import app
 from app.routers.auth import _session_for
+from app.world import invalidate
 from scripts.seed import uid
 
 P = "/api/v1"
@@ -22,6 +23,12 @@ def hs256_secret(monkeypatch):
     """Unit tests mint HS256 tokens. Real projects verify through JWKS and may have no secret set."""
     if not settings.supabase_jwt_secret:
         monkeypatch.setattr(settings, "supabase_jwt_secret", TEST_JWT_SECRET)
+
+
+@pytest.fixture(autouse=True)
+def fresh_world():
+    """Fixtures and tests also write straight to the database, which the API's cached world can't see."""
+    invalidate()
 
 
 def session_headers(user_id: str) -> dict:
