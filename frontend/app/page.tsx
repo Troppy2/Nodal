@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Check, MessageCircle } from "lucide-react";
-import { Avatar } from "@/components/Avatar";
+import { ArrowRight, Check } from "lucide-react";
 import { CoverArt } from "@/components/feed/CoverArt";
 import { SignInButton, SignInForm } from "@/components/landing/SignInButton";
 import { Label } from "@/components/Meta";
@@ -25,67 +24,6 @@ const steps = [
     body: "Invites are DMs, so the confirmation you see is the message they get. Follow up in the same thread.",
   },
 ];
-
-const samplePeople = [
-  { id: "demo-maya", handle: "maya", display_name: "Maya Okafor", avatar_url: null, skill: "ESP32 firmware", tag: "Swap" },
-  { id: "demo-dev", handle: "dev", display_name: "Dev Rahman", avatar_url: null, skill: "Sound design", tag: "Ring" },
-  { id: "demo-rin", handle: "rin", display_name: "Rin Castillo", avatar_url: null, skill: "Generative art", tag: "Ring" },
-];
-
-function MatchPreview() {
-  return (
-    <div className="mx-auto w-full max-w-[460px] lg:mx-0">
-      <div className="rounded-xl border border-line bg-white p-4">
-        <div className="flex items-center gap-3">
-          <CoverArt cover={{ pattern: "rings", tint: "creative" }} seed="soil-choir" className="size-14 shrink-0 rounded-lg" />
-          <div className="min-w-0 flex-1">
-            <Label>Example project</Label>
-            <p className="truncate text-lg font-extrabold leading-tight tracking-tight">Soil Choir</p>
-            <p className="text-xs text-muted-ink">Creative · Idea</p>
-          </div>
-          <span className="shrink-0 rounded-md bg-teal-tint px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-teal">
-            3 needs
-          </span>
-        </div>
-
-        <div className="mt-4 overflow-hidden rounded-lg border border-line">
-          <div className="flex items-center justify-between border-b border-line px-3 py-2">
-            <Label>People who fit</Label>
-            <span className="text-xs text-muted-ink">3</span>
-          </div>
-          <ul className="divide-y divide-line">
-            {samplePeople.map((p) => (
-              <li key={p.id} className="flex items-center gap-3 px-3 py-2.5">
-                <Avatar person={p} size={32} />
-                <div className="min-w-0 flex-1 leading-tight">
-                  <p className="truncate text-sm font-semibold">{p.display_name}</p>
-                  <p className="truncate text-xs text-muted-ink">{p.skill}</p>
-                </div>
-                <span
-                  className={cn(
-                    "shrink-0 rounded-md border px-1.5 py-0.5 text-[11px] font-semibold",
-                    p.tag === "Swap" ? "border-teal/40 text-teal" : "border-line text-muted-ink",
-                  )}
-                >
-                  {p.tag}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="mt-3 flex items-start gap-2 rounded-lg bg-sunken px-3 py-2.5">
-          <MessageCircle className="mt-0.5 size-4 shrink-0 text-teal" />
-          <p className="text-xs leading-snug">
-            <span className="font-semibold">Invite sent to Maya.</span>{" "}
-            <span className="text-muted-ink">It&apos;s already in Messages — the confirmation and the DM are the same thing.</span>
-          </p>
-        </div>
-      </div>
-      <p className="mt-2.5 text-center text-xs text-muted-ink lg:text-left">Preview with sample data. Your matches come from your skills.</p>
-    </div>
-  );
-}
 
 export default function LandingPage() {
   return (
@@ -135,7 +73,13 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <MatchPreview />
+          <div className="mx-auto w-full max-w-[460px] lg:mx-0">
+            <CoverArt
+              cover={{ pattern: "rings", tint: "creative" }}
+              seed="soil-choir"
+              className="aspect-square w-full rounded-2xl border border-line"
+            />
+          </div>
         </section>
 
         <section id="how" className="scroll-mt-20 border-y border-line bg-sunken/40">
