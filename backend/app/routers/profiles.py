@@ -3,69 +3,67 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ..db import service_client
+from ..db import parallel, service_client
 from ..deps import get_optional_user
 from ..models import ActivityDay, ProfileOut
-from ..services.cards import load_cards, profile_lite, skill_out, skills_by_id
+from ..services.cards import cards, profile_lite, skill_out
+from ..world import World, world
 
 router = APIRouter()
 
 
-def profile_by_handle(handle: str) -> dict:
-    rows = service_client().table("profiles").select("*").eq("handle", handle).limit(1).execute().data
-    if not rows:
+def offers_out(skills: dict[int, dict], offers: dict[int, int]) -> list[dict]:
+    """Offers, strongest first, then by skill name."""
+    rows = [{"skill": skill_out(skills[s]), "level": lvl} for s, lvl in offers.items() if s in skills]
+    return sorted(rows, key=lambda o: (-o["level"], o["skill"]["name"]))
+
+
+def _profile_id(w: World, handle: str) -> str:
+    pid = w.by_handle.get(handle)
+    if pid is None:
         raise HTTPException(404, "Profile not found")
-    return rows[0]
+    return pid
 
 
-def offers_for(profile_id: str) -> list[dict]:
-    skills = skills_by_id()
-    rows = service_client().table("profile_offers").select("skill_id,level").eq("profile_id", profile_id).execute().data
-    return sorted(
-        ({"skill": skill_out(skills[r["skill_id"]]), "level": r["level"]} for r in rows),
-        key=lambda o: (-o["level"], o["skill"]["name"]),
-    )
+def _joined_contributors(w: World, project_id: str) -> list[dict]:
+    return [m for m in w.members.get(project_id, []) if m["role"] == "contributor" and m["status"] == "joined"]
 
 
 @router.get("/profiles/{handle}", response_model=ProfileOut)
 def get_profile(handle: str, viewer: dict | None = Depends(get_optional_user)):
-    p = profile_by_handle(handle)
-    sb = service_client()
+    w = world()
+    pid = _profile_id(w, handle)
+    p = w.profiles[pid]
     viewer_id = viewer and viewer["id"]
-    projects = sb.table("projects").select("id").eq("owner_id", p["id"]).order("created_at", desc=True).execute().data
-    ids = [r["id"] for r in projects]
-    stars = len(sb.table("project_stars").select("profile_id").in_("project_id", ids).execute().data) if ids else 0
-    contrib = sb.table("project_members").select("project_id").eq("profile_id", p["id"]).eq("role", "contributor") \
-        .eq("status", "joined").execute().data
-    on_mine = (sb.table("project_members").select("profile_id").in_("project_id", ids).eq("role", "contributor")
-               .eq("status", "joined").execute().data if ids else [])
-    followers = sb.table("follows").select("follower_id").eq("followee_id", p["id"]).execute().data
+    owned = w.owned.get(pid, [])
+    helped_elsewhere = sum(1 for proj in w.projects for m in _joined_contributors(w, proj) if m["profile_id"] == pid)
+    helpers_on_mine = sum(len(_joined_contributors(w, proj)) for proj in owned)
     return {
         "profile": profile_lite(p), "bio": p.get("bio"), "interests": p.get("interests") or [],
-        "offers": offers_for(p["id"]),
-        "stats": {"projects": len(ids), "stars": stars, "collaborations": len(contrib) + len(on_mine),
-                  "followers": len(followers)},
-        "projects": load_cards(ids, viewer_id),
-        "viewer_follows": bool(viewer_id) and any(f["follower_id"] == viewer_id for f in followers),
-        "is_me": viewer_id == p["id"],
+        "offers": offers_out(w.skills, w.offers.get(pid, {})),
+        "stats": {"projects": len(owned), "stars": sum(len(w.stars.get(proj, ())) for proj in owned),
+                  "collaborations": helped_elsewhere + helpers_on_mine, "followers": len(w.followers.get(pid, ()))},
+        "projects": cards(w, owned, viewer_id),
+        "viewer_follows": viewer_id in w.followers.get(pid, ()),
+        "is_me": viewer_id == pid,
     }
 
 
 @router.get("/profiles/{handle}/activity", response_model=list[ActivityDay])
 def activity(handle: str, weeks: int = Query(52, ge=1, le=53)):
-    p = profile_by_handle(handle)
-    sb = service_client()
+    """Contributions per day: projects started, comments, requests to help, and teams joined."""
+    pid = _profile_id(world(), handle)
     since = (datetime.now(timezone.utc) - timedelta(weeks=weeks)).isoformat()
-    days: Counter[str] = Counter()
-    sources = [
-        ("projects", "owner_id"),
-        ("comments", "author_id"),
-        ("collab_requests", "from_profile_id"),
-    ]
-    for table, col in sources:
-        for r in sb.table(table).select("created_at").eq(col, p["id"]).gte("created_at", since).execute().data:
-            days[r["created_at"][:10]] += 1
-    for r in sb.table("project_members").select("created_at").eq("profile_id", p["id"]).eq("role", "contributor") \
-            .eq("status", "joined").gte("created_at", since).execute().data:
-        days[r["created_at"][:10]] += 1
+    t = service_client().table
+
+    def created(table: str, column: str, **eq):
+        q = t(table).select("created_at").eq(column, pid).gte("created_at", since)
+        for k, v in eq.items():
+            q = q.eq(k, v)
+        return lambda: q.execute().data
+
+    groups = parallel(created("projects", "owner_id"), created("comments", "author_id"),
+                      created("collab_requests", "from_profile_id"),
+                      created("project_members", "profile_id", role="contributor", status="joined"))
+    days = Counter(r["created_at"][:10] for rows in groups for r in rows)
     return [{"date": d, "count": c} for d, c in sorted(days.items())]

@@ -13,13 +13,15 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from ..config import settings
-from ..db import service_client
+from ..db import parallel, service_client
+from ..handles import handle_base, unique_handle
 from ..limits import limiter
 
 router = APIRouter()
 
 # Accounts need an email internally; these addresses are never shown or sent to.
 EMAIL_DOMAIN = "users.nodal.local"
+# PostgREST treats * % _ \ and its own , ( ) specially inside ilike, so such names never match a person.
 PATTERN_CHARS = re.compile(r"[*%_\\,()]")
 
 
@@ -35,52 +37,41 @@ class SessionOut(BaseModel):
     created: bool
 
 
-def _slug(name: str) -> str:
-    s = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:24]
-    return s if len(s) >= 2 else f"user-{s}".strip("-")
-
-
 def _find_profile(name: str) -> dict | None:
+    """By handle, else the oldest profile whose display name equals the name (any case). Both in parallel."""
     sb = service_client()
-    by_handle = sb.table("profiles").select("id,handle").eq("handle", _slug(name)).limit(1).execute().data
-    if by_handle:
-        return by_handle[0]
-    # ilike is only an exact, case-insensitive match when the name has no pattern characters
-    # (PostgREST treats * % _ \ and its own , ( ) specially). Such names never match an existing person.
-    if PATTERN_CHARS.search(name):
-        return None
-    by_name = sb.table("profiles").select("id,handle").ilike("display_name", name).order("created_at").limit(1).execute().data
-    return by_name[0] if by_name else None
 
+    def by_handle():
+        return sb.table("profiles").select("id").eq("handle", handle_base(name)).limit(1).execute().data
 
-def _unique_handle(base: str) -> str:
-    sb = service_client()
-    handle = base
-    for n in range(2, 50):
-        if not sb.table("profiles").select("id").eq("handle", handle).execute().data:
-            return handle
-        handle = f"{base}-{n}"
-    return f"{base}-{uuid.uuid4().hex[:6]}"
+    def by_name():
+        if PATTERN_CHARS.search(name):
+            return []
+        return sb.table("profiles").select("id").ilike("display_name", name).order("created_at").limit(1).execute().data
+
+    handle_hit, name_hit = parallel(by_handle, by_name)
+    hit = handle_hit or name_hit
+    return hit[0] if hit else None
 
 
 def _create_user(name: str) -> str:
     sb = service_client()
-    handle = _unique_handle(_slug(name))
-    res = sb.auth.admin.create_user({
+    handle = unique_handle(name)
+    user_id = sb.auth.admin.create_user({
         "email": f"{handle}-{uuid.uuid4().hex[:6]}@{EMAIL_DOMAIN}",
         "email_confirm": True,
         "user_metadata": {"name": name},
-    })
-    user_id = res.user.id
-    # The signup trigger made a placeholder handle; replace it with one derived from the name.
+    }).user.id
+    # the signup trigger made the profile with a placeholder handle; name it now
     sb.table("profiles").update({"handle": handle, "display_name": name}).eq("id", user_id).execute()
     return user_id
 
 
 def _session_for(user_id: str) -> dict:
+    """A real session for an existing user, without a password: generate a magic link and verify it here."""
     sb = service_client()
-    user = sb.auth.admin.get_user_by_id(user_id).user
-    link = sb.auth.admin.generate_link({"type": "magiclink", "email": user.email})
+    email = sb.auth.admin.get_user_by_id(user_id).user.email
+    link = sb.auth.admin.generate_link({"type": "magiclink", "email": email})
     r = httpx.post(
         f"{settings.supabase_url}/auth/v1/verify",
         headers={"apikey": settings.supabase_anon_key},

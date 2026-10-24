@@ -1,9 +1,7 @@
 """Request and response models. This file is the API contract the frontend builds against
 (it reads /openapi.json). Tolken is the in-app currency; there is no money anywhere in Nodal."""
 
-from typing import Literal
-
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, Field
 

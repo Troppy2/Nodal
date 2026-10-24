@@ -1,19 +1,47 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from fastapi.middleware.cors import CORSMiddleware
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from . import errors
 from .config import settings
 from .limits import limiter
-from .slugs import SlugMiddleware
 from .routers import (
     auth, collab, comments, feed, graph, ideas, inbox, matches, me, messages, profiles, projects, recommendations,
     research, skills, social, source, team, tolken,
 )
+from .slugs import SlugMiddleware
+from .world import invalidate
+
+READ_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+
+class InvalidateOnWrite:
+    """After any request that may have written (POST, PUT, PATCH, DELETE), drop the cached world, so
+    the next read sees the change. It runs as the response starts: the handler's writes are done, and
+    the client can't send its next request before the cache is cleared."""
+
+    def __init__(self, app: ASGIApp):
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope["method"] in READ_METHODS:
+            return await self.app(scope, receive, send)
+
+        async def send_after_invalidating(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                invalidate()
+            await send(message)
+
+        await self.app(scope, receive, send_after_invalidating)
+
 
 app = FastAPI(title="Nodal API")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+errors.install(app)
+app.add_middleware(InvalidateOnWrite)
 app.add_middleware(SlugMiddleware)
 app.add_middleware(
     CORSMiddleware,
