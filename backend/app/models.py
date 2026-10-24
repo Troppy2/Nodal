@@ -3,9 +3,23 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from typing import Annotated
+
+from pydantic import AfterValidator, BaseModel, Field
 
 ProjectType = Literal["software", "hardware", "creative"]
+
+
+def _web_url(value: str | None) -> str | None:
+    """Links render as <a href>, so only http(s) is allowed (blocks javascript: and data: URLs)."""
+    if value is None or value == "":
+        return None
+    if not value.lower().startswith(("http://", "https://")) or len(value) > 500:
+        raise ValueError("Use a link that starts with http:// or https://")
+    return value
+
+
+WebUrl = Annotated[str | None, AfterValidator(_web_url)]
 Stage = Literal["idea", "building", "shipped"]
 
 
@@ -107,8 +121,8 @@ class ProjectIn(BaseModel):
     type: ProjectType
     stage: Stage = "idea"
     readme_md: str | None = None
-    repo_url: str | None = None
-    demo_url: str | None = None
+    repo_url: WebUrl = None
+    demo_url: WebUrl = None
     tags: list[str] = Field(default=[], max_length=10)
     needs: list[NeedIn] = []
 
@@ -118,8 +132,8 @@ class ProjectPatch(BaseModel):
     summary: str | None = None
     readme_md: str | None = None
     stage: Stage | None = None
-    repo_url: str | None = None
-    demo_url: str | None = None
+    repo_url: WebUrl = None
+    demo_url: WebUrl = None
     source_access: Literal["none", "open"] | None = None
 
 

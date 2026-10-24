@@ -202,3 +202,14 @@ def test_seeded_source_tree(client, seeded):
     assert "analogRead" in f["content"]
     assert client.get(f"{P}/projects/{pid}").json()["has_source"] is True
     assert client.get(f"{P}/projects/{pid}/source/file", params={"path": "nope"}).status_code == 404
+
+
+def test_project_links_must_be_http(client, new_user):
+    u = new_user()
+    body = {"title": "Link test", "summary": "s", "type": "software", "stage": "idea", "repo_url": "javascript:alert(1)"}
+    assert client.post("/api/v1/projects", json=body, headers=u["headers"]).status_code == 422
+    body["repo_url"] = "https://github.com/example/repo"
+    r = client.post("/api/v1/projects", json=body, headers=u["headers"])
+    assert r.status_code == 201
+    pid = r.json()["id"]
+    assert client.patch(f"/api/v1/projects/{pid}", json={"demo_url": "data:text/html,x"}, headers=u["headers"]).status_code == 422
