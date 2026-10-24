@@ -35,35 +35,43 @@ def test_cors_allowed_and_denied():
 
 
 def test_jwt_missing_invalid_wrong_aud_expired():
-    assert client.get(f"{P}/feed").status_code == 401
+    url = f"{P}/feed/stories"
+    assert client.get(url).status_code == 401
+    assert client.get(url, headers={"Authorization": "Bearer junk"}).status_code == 401
+    assert client.get(url, headers=auth(aud="anon")).status_code == 401
+    assert client.get(url, headers=auth(secret="x" * 40)).status_code == 401
+    assert client.get(url, headers=auth(exp=-10)).status_code == 401
+    # a bad token on a public endpoint is still rejected rather than silently ignored
     assert client.get(f"{P}/feed", headers={"Authorization": "Bearer junk"}).status_code == 401
-    assert client.get(f"{P}/feed", headers=auth(aud="anon")).status_code == 401
-    assert client.get(f"{P}/feed", headers=auth(secret="x" * 40)).status_code == 401
-    assert client.get(f"{P}/feed", headers=auth(exp=-10)).status_code == 401
 
 
-def test_feed_shape():
-    r = client.get(f"{P}/feed?tab=for_you", headers=auth())
+def test_feed_shape_anonymous():
+    r = client.get(f"{P}/feed?tab=for_you")
     assert r.status_code == 200
     body = r.json()
     assert set(body) == {"items", "next_cursor"}
     post = body["items"][0]
-    for k in ["id", "title", "stage", "type", "cover", "owner", "needs", "star_count",
+    for k in ["id", "title", "stage", "type", "cover", "owner", "needs", "tags", "star_count",
               "comment_count", "people_fit", "badges", "viewer_starred"]:
         assert k in post
     assert set(post["cover"]) == {"pattern", "tint"}
     assert set(post["badges"]) == {"market_verdict", "cool_score"}
+    assert body["next_cursor"] == "10"
+    page2 = client.get(f"{P}/feed?tab=for_you&cursor=10").json()
+    assert not {p["id"] for p in page2["items"]} & {p["id"] for p in body["items"]}
 
 
 def test_feed_ideas_filter_and_bad_tab():
-    items = client.get(f"{P}/feed?tab=ideas", headers=auth()).json()["items"]
+    items = client.get(f"{P}/feed?tab=ideas").json()["items"]
     assert items and all(i["stage"] == "idea" for i in items)
-    assert client.get(f"{P}/feed?tab=nope", headers=auth()).status_code == 422
+    assert client.get(f"{P}/feed?tab=nope").status_code == 422
+    assert client.get(f"{P}/feed?tab=following").json()["items"] == []
 
 
-def test_stories_shape():
-    r = client.get(f"{P}/feed/stories", headers=auth())
+def test_stories_shape(new_user):
+    u = new_user()
+    r = client.get(f"{P}/feed/stories", headers=u["headers"])
     assert r.status_code == 200
     for s in r.json():
-        assert set(s) == {"profile", "tag"}
+        assert set(s) == {"profile", "tag", "trade"}
         assert s["tag"] in ("swap", "ring", None)
