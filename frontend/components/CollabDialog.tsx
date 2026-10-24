@@ -1,24 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { api } from "@/lib/api";
+import type { ProjectCard } from "@/lib/api-types";
 import { formatTolken } from "@/lib/cover";
-import { me, type Project, viewerFits } from "@/lib/catalog";
-import { useDemoStore } from "@/lib/store";
+import { useSession } from "@/lib/session";
 import { btn } from "@/lib/styles";
+import { invalidate } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
-
-export function requestKey(projectId: string, skill: string) {
-  return `${projectId}:${skill}`;
-}
-
-/** True when the viewer already asked to help with any need on this project. */
-export function useRequested(project: Project) {
-  const { requested } = useDemoStore();
-  return project.needs.some((n) => requested.has(requestKey(project.id, n.skill)));
-}
 
 /**
  * The collab request flow (POST /projects/{id}/collab-requests): pick the need you can fill, say what you'd do first.
@@ -28,26 +21,44 @@ export function CollabDialog({
   project,
   open,
   onOpenChange,
-  skill,
+  skillId,
+  onSent,
 }: {
-  project: Project;
+  project: ProjectCard;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Preselect a need. */
-  skill?: string;
+  skillId?: number;
+  onSent?: (skillId: number) => void;
 }) {
-  const { requested, add } = useDemoStore();
-  const idea = project.stage === "idea";
-  const firstFit = project.needs.find((n) => viewerFits(project, n))?.skill;
-  const [choice, setChoice] = useState(skill ?? firstFit ?? project.needs[0]?.skill);
+  const openNeeds = project.needs.filter((n) => n.status === "open");
+  const firstFit = openNeeds.find((n) => n.viewer_fits && !n.viewer_requested)?.skill.id;
+  const firstFree = openNeeds.find((n) => !n.viewer_requested)?.skill.id;
+  const [choice, setChoice] = useState<number | undefined>(skillId ?? firstFit ?? firstFree);
   const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const idea = project.stage === "idea";
+  const owner = project.owner.display_name || project.owner.handle;
 
-  function send() {
+  async function send() {
     if (!choice) return;
-    add("requested", requestKey(project.id, choice));
-    toast.success(`Request sent to ${project.owner.handle}`, { description: `${choice} for ${project.title}` });
-    setMessage("");
-    onOpenChange(false);
+    setSending(true);
+    try {
+      await api(`/projects/${project.id}/collab-requests`, {
+        method: "POST",
+        body: { skill_id: choice, message: message.trim() || null },
+      });
+      const skill = openNeeds.find((n) => n.skill.id === choice)?.skill.name;
+      toast.success(`Request sent to ${owner}`, { description: `${skill} for ${project.title}` });
+      setMessage("");
+      onSent?.(choice);
+      invalidate(`/projects/${project.id}`, "/feed", "/projects?", "/me/inbox");
+      onOpenChange(false);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -58,24 +69,22 @@ export function CollabDialog({
             {idea ? "Join" : "Help with"} {project.title}
           </DialogTitle>
           <DialogDescription className="mt-1 text-sm text-muted-ink">
-            {project.owner.name} sees your skills and this note, then accepts or declines.
+            {owner} sees your skills and this note, then accepts or declines.
           </DialogDescription>
         </div>
 
         <fieldset className="flex flex-col gap-2">
           <legend className="mb-2 text-sm font-semibold">What would you take on?</legend>
-          {project.needs.map((n) => {
-            const key = requestKey(project.id, n.skill);
-            const sent = requested.has(key);
-            const fits = viewerFits(project, n);
-            const on = choice === n.skill;
+          {openNeeds.map((n) => {
+            const sent = n.viewer_requested;
+            const on = choice === n.skill.id;
             return (
               <label
-                key={n.skill}
+                key={n.id}
                 className={cn(
                   "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
-                  on ? "border-teal bg-teal-tint/50" : "border-line hover:bg-sunken",
-                  sent && "cursor-default opacity-60",
+                  on ? "border-teal bg-teal-tint/50" : "border-line hover:border-ink/30 hover:bg-sunken",
+                  sent && "cursor-default opacity-60 hover:bg-transparent",
                 )}
               >
                 <input
@@ -84,19 +93,19 @@ export function CollabDialog({
                   className="mt-1 accent-teal"
                   checked={on}
                   disabled={sent}
-                  onChange={() => setChoice(n.skill)}
+                  onChange={() => setChoice(n.skill.id)}
                 />
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-x-2 text-sm font-semibold">
-                    {n.skill}
-                    {n.bounty_tolken && <span className="font-mono text-xs text-teal">{formatTolken(n.bounty_tolken)} bounty</span>}
+                    {n.skill.name}
+                    {n.bounty_tolken && <span className="text-xs font-medium text-teal">{formatTolken(n.bounty_tolken)} bounty</span>}
                   </span>
-                  <span className="block text-[13px] text-muted-ink">{n.note}</span>
+                  {n.note && <span className="block text-[13px] text-muted-ink">{n.note}</span>}
                 </span>
                 {sent ? (
                   <span className="text-xs text-teal">Sent</span>
                 ) : (
-                  fits && <span className="text-xs text-teal">You offer this</span>
+                  n.viewer_fits && <span className="text-xs text-teal">You offer this</span>
                 )}
               </label>
             );
@@ -109,6 +118,7 @@ export function CollabDialog({
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={3}
+            maxLength={1000}
             placeholder="What you'd do first, and when you're free"
             className="resize-none rounded-lg border border-line px-3 py-2.5 text-sm outline-none placeholder:text-muted-ink focus:border-ink"
           />
@@ -118,11 +128,8 @@ export function CollabDialog({
           <button className={btn.ghost} onClick={() => onOpenChange(false)}>
             Cancel
           </button>
-          <button
-            className={btn.match}
-            disabled={!choice || requested.has(requestKey(project.id, choice))}
-            onClick={send}
-          >
+          <button className={btn.match} disabled={!choice || sending} onClick={send}>
+            {sending && <Loader2 className="size-4 animate-spin" />}
             Send request
           </button>
         </div>
@@ -131,26 +138,56 @@ export function CollabDialog({
   );
 }
 
-/** The one button that opens the dialog, with its settled state. */
-export function CollabButton({ project, className, skill, label }: { project: Project; className?: string; skill?: string; label?: string }) {
+/** The one button that opens the dialog, with its settled state. Hidden on your own projects. */
+export function CollabButton({
+  project,
+  skillId,
+  className,
+  label,
+}: {
+  project: ProjectCard;
+  skillId?: number;
+  className?: string;
+  label?: string;
+}) {
+  const { me, signedIn } = useSession();
   const [open, setOpen] = useState(false);
-  const { requested } = useDemoStore();
-  const anyRequested = useRequested(project);
-  const sent = skill ? requested.has(requestKey(project.id, skill)) : anyRequested;
-  if (project.owner.handle === me.handle || project.needs.length === 0) return null;
+  const [sentHere, setSentHere] = useState<number[]>([]);
+  const openNeeds = project.needs.filter((n) => n.status === "open");
+  if (openNeeds.length === 0 || me?.profile.id === project.owner.id) return null;
+
+  const requested = (id: number) => sentHere.includes(id) || openNeeds.some((n) => n.skill.id === id && n.viewer_requested);
+  const sent = skillId !== undefined ? requested(skillId) : openNeeds.every((n) => requested(n.skill.id));
   const text = label ?? (project.stage === "idea" ? "Join this idea" : "Offer to help");
+
+  // Signed-out visitors go to sign in first.
+  if (!signedIn) {
+    return (
+      <Link href="/" className={cn(btn.match, className)}>
+        {text}
+      </Link>
+    );
+  }
   return (
     <>
       {sent ? (
-        <button className={cn(btn.done, className)} onClick={() => setOpen(true)}>
+        <span className={cn(btn.done, "pointer-events-none", className)}>
           <Check className="size-4" /> Requested
-        </button>
+        </span>
       ) : (
         <button className={cn(btn.match, className)} onClick={() => setOpen(true)}>
           {text}
         </button>
       )}
-      <CollabDialog project={project} open={open} onOpenChange={setOpen} skill={skill} />
+      {open && (
+        <CollabDialog
+          project={project}
+          open={open}
+          onOpenChange={setOpen}
+          skillId={skillId}
+          onSent={(id) => setSentHere((s) => [...s, id])}
+        />
+      )}
     </>
   );
 }

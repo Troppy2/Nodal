@@ -4,8 +4,10 @@
 export type ProjectType = "software" | "hardware" | "creative";
 export type Stage = "idea" | "building" | "shipped";
 
+export type CoverPattern = "rings" | "bars" | "blocks" | "stripes" | "dots";
+
 export interface Cover {
-  pattern: "rings" | "bars" | "blocks" | "stripes" | "dots";
+  pattern: CoverPattern;
   tint: ProjectType;
 }
 

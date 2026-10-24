@@ -1,31 +1,35 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { ChevronLeft, SendHorizontal } from "lucide-react";
+import { Check, ChevronLeft, X } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar } from "@/components/Avatar";
-import { Label } from "@/components/Meta";
-import { getProject } from "@/lib/catalog";
-import type { Message, Thread } from "@/lib/seed-inbox";
-import { useDemoStore } from "@/lib/store";
+import { EmptyState, ErrorState, RowsSkeleton } from "@/components/checks/States";
+import { api } from "@/lib/api";
+import type { CollabOut, Cycle, InboxItem, ProfileLite } from "@/lib/api-types";
+import { useSession } from "@/lib/session";
 import { btn } from "@/lib/styles";
+import { invalidate, useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
-import { RingInviteCard, type Response } from "./RingInviteCard";
+import { ago, describe, displayName, joinNames } from "./format";
+import { RingInviteCard } from "./RingInviteCard";
 
-type Filter = "requests" | "messages";
+type Filter = "requests" | "sent";
 
-const kindLabel = { ring: "Ring", swap: "Swap", join: "Join request" } as const;
+const kindLabel = { collab: "Join request", swap: "Swap", ring: "Ring" } as const;
 
-function Faces({ thread, size }: { thread: Thread; size: number }) {
-  if (thread.people.length === 1) return <Avatar person={thread.people[0]} size={size} />;
+function Faces({ people, size }: { people: ProfileLite[]; size: number }) {
+  if (people.length === 0) return <span className="shrink-0 rounded-full bg-sunken" style={{ width: size, height: size }} />;
+  if (people.length === 1) return <Avatar person={people[0]} size={size} />;
   // Two faces side by side with a slight overlap, so both sets of initials stay readable.
   const small = Math.round(size * 0.72);
   return (
     <span className="flex shrink-0 items-center" style={{ width: size + small * 0.45 }}>
-      <Avatar person={thread.people[0]} size={small} />
+      <Avatar person={people[0]} size={small} />
       <span className="-ml-2 rounded-full border-2 border-white">
-        <Avatar person={thread.people[1]} size={small} />
+        <Avatar person={people[1]} size={small} />
       </span>
     </span>
   );
@@ -34,200 +38,345 @@ function Faces({ thread, size }: { thread: Thread; size: number }) {
 function FilterToggle({ value, onChange }: { value: Filter; onChange: (f: Filter) => void }) {
   return (
     <div className="flex rounded-lg border border-line p-0.5" role="group" aria-label="Show">
-      {(["requests", "messages"] as const).map((f) => (
+      {(["requests", "sent"] as const).map((f) => (
         <button
           key={f}
           aria-pressed={value === f}
           onClick={() => onChange(f)}
           className={cn(
-            "h-9 rounded-md px-3 text-sm font-semibold transition-colors",
-            value === f ? "bg-ink text-white" : "text-muted-ink hover:text-ink",
+            "h-9 cursor-pointer rounded-md px-3.5 text-sm font-semibold capitalize transition-colors",
+            value === f ? "bg-ink text-white" : "text-muted-ink hover:bg-sunken hover:text-ink",
           )}
         >
-          {f === "requests" ? "Requests" : "Messages"}
+          {f}
         </button>
       ))}
     </div>
   );
 }
 
-function threadTitle(t: Thread) {
-  if (t.kind === "ring") return `3-way ring with ${t.name}`;
-  if (t.kind === "swap") return `Swap with ${t.name}`;
-  return `${t.name} wants to join ${getProject(t.links[0].projectId)?.title ?? ""}`;
+function statusText(item: InboxItem) {
+  if (item.actions.length) return null;
+  return item.status === "accepted" ? "Accepted" : item.status === "declined" ? "Declined" : "Pending";
 }
 
-export function InboxView({ threads }: { threads: Thread[] }) {
+function ItemRow({ item, active, onOpen }: { item: InboxItem; active: boolean; onOpen: () => void }) {
+  const { title, summary } = describe(item);
+  const status = statusText(item);
+  return (
+    <li>
+      <button
+        onClick={onOpen}
+        aria-current={active ? "true" : undefined}
+        className={cn(
+          "flex w-full cursor-pointer items-start gap-3 px-5 py-3.5 text-left transition-colors focus-visible:outline-offset-[-3px]",
+          active ? "bg-sunken" : "hover:bg-sunken/60",
+        )}
+      >
+        <Faces people={item.people} size={44} />
+        <span className="min-w-0 flex-1">
+          <span className="flex items-baseline justify-between gap-2">
+            <span className="truncate text-[15px] font-semibold">{title}</span>
+            <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-ink">
+              {ago(item.created_at)}
+              {item.actions.length > 0 && <span className="size-2 rounded-full bg-teal" aria-label="Needs your answer" />}
+            </span>
+          </span>
+          <span className="block truncate text-sm text-muted-ink">{summary}</span>
+          <span className="mt-1 flex gap-2 text-xs">
+            <span className={cn("font-medium", item.kind === "collab" ? "text-ink" : "text-teal")}>{kindLabel[item.kind]}</span>
+            {status && <span className="text-muted-ink">{status}</span>}
+          </span>
+        </span>
+      </button>
+    </li>
+  );
+}
+
+function CollabCard({
+  item,
+  busy,
+  onRespond,
+}: {
+  item: InboxItem;
+  busy: boolean;
+  onRespond: (r: "accepted" | "declined") => void;
+}) {
+  const other = item.people[0];
+  const incoming = item.direction === "incoming";
+  const project = item.project;
+  return (
+    <div className="focus-inset overflow-hidden rounded-xl border border-line">
+      <div className="px-4 py-4">
+        <p className="text-[15px] leading-relaxed">
+          {incoming ? (
+            <>
+              <span className="font-semibold">{other ? displayName(other) : "Someone"}</span> wants to help with{" "}
+              {project ? (
+                <Link href={`/projects/${project.id}`} className="font-semibold underline decoration-line underline-offset-4 hover:decoration-ink">
+                  {project.title}
+                </Link>
+              ) : (
+                "your project"
+              )}{" "}
+              as <span className="font-semibold">{item.skill?.name}</span>.
+            </>
+          ) : (
+            <>
+              You offered <span className="font-semibold">{item.skill?.name}</span> for{" "}
+              {project ? (
+                <Link href={`/projects/${project.id}`} className="font-semibold underline decoration-line underline-offset-4 hover:decoration-ink">
+                  {project.title}
+                </Link>
+              ) : (
+                "a project"
+              )}
+              .
+            </>
+          )}
+        </p>
+        {item.message && (
+          <blockquote className="mt-3 border-l-2 border-line pl-3 text-[15px] leading-relaxed text-ink/80">{item.message}</blockquote>
+        )}
+      </div>
+      <div className="border-t border-line bg-sunken/60 px-4 py-3">
+        {item.actions.length > 0 ? (
+          <div className="flex gap-2 max-sm:flex-col">
+            <button disabled={busy} onClick={() => onRespond("accepted")} className={cn(btn.match, "max-sm:w-full")}>
+              Accept
+            </button>
+            <button disabled={busy} onClick={() => onRespond("declined")} className={cn(btn.secondary, "max-sm:w-full")}>
+              Decline
+            </button>
+          </div>
+        ) : item.status === "accepted" ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="flex items-center gap-2 text-sm font-semibold text-teal">
+              <Check className="size-4" /> {incoming ? `${other ? displayName(other) : "They"} joined the team` : "Accepted. You're on the team."}
+            </p>
+            {project && (
+              <Link href={`/projects/${project.id}/team`} className={btn.secondary}>
+                Open team
+              </Link>
+            )}
+          </div>
+        ) : item.status === "declined" ? (
+          <p className="flex items-center gap-2 text-sm text-muted-ink">
+            <X className="size-4" /> Declined
+          </p>
+        ) : (
+          <p className="text-sm text-muted-ink">Waiting on {other ? displayName(other) : "the owner"}.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CycleSuggestions({
+  cycles,
+  items,
+  meId,
+  onInvited,
+}: {
+  cycles: Cycle[];
+  items: InboxItem[];
+  meId: string;
+  onInvited: (item: InboxItem) => void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const key = (ids: string[]) => [...ids].sort().join(",");
+  const started = new Set(
+    items.filter((i) => i.kind !== "collab" && i.status !== "declined").map((i) => `${i.kind}:${key(Object.keys(i.responses))}`),
+  );
+  const open = cycles.filter((c) => !started.has(`${c.kind}:${key(c.members.map((m) => m.id))}`));
+  if (open.length === 0) return null;
+
+  async function invite(c: Cycle) {
+    setBusy(c.id);
+    try {
+      const item = await api<InboxItem>("/cycles/invite", { method: "POST", body: { cycle_id: c.id } });
+      toast.success(c.kind === "swap" ? "Swap invite sent" : "Ring invite sent");
+      onInvited(item);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section aria-labelledby="start-title" className="border-t border-line px-5 py-4">
+      <h2 id="start-title" className="text-[13px] font-semibold text-muted-ink">
+        Swaps and rings you can start
+      </h2>
+      <ul className="mt-2 flex flex-col">
+        {open.slice(0, 5).map((c) => {
+          const others = c.members.filter((m) => m.id !== meId);
+          const mine = c.links.find((l) => l.from === meId);
+          return (
+            <li key={c.id} className="flex items-center gap-3 py-2">
+              <Faces people={others} size={36} />
+              <div className="min-w-0 flex-1 leading-snug">
+                <p className="truncate text-sm font-semibold">
+                  {c.kind === "swap" ? "Swap" : "Ring"} with {joinNames(others.map(displayName))}
+                </p>
+                {mine && <p className="truncate text-[13px] text-muted-ink">You do {mine.skill.name} for {mine.project_title}</p>}
+              </div>
+              <button disabled={busy === c.id} onClick={() => invite(c)} className={cn(btn.match, "h-9 px-3")}>
+                Invite
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+/** Requests in one place: join requests, swap invites, and ring invites. List and detail on desktop; one at a time on mobile. */
+export function InboxView() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const paramId = params.get("thread");
-  const { responses, respond } = useDemoStore();
-
+  const { ready, signedIn, me } = useSession();
+  const inbox = useApi<InboxItem[]>(signedIn ? "/me/inbox" : null);
+  const cycles = useApi<Cycle[]>(signedIn ? "/me/cycles" : null);
   const [filter, setFilter] = useState<Filter>("requests");
-  const [opened, setOpened] = useState<Set<string>>(() => new Set(paramId ? [paramId] : []));
-  const [chats, setChats] = useState<Record<string, Message[]>>(() => Object.fromEntries(threads.map((t) => [t.id, t.messages])));
-  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const selectedId = params.get("thread");
+  const meProfile = me?.profile ?? null;
 
-  const selected = threads.find((t) => t.id === paramId);
-  // Desktop always shows a thread; mobile shows the list until one is picked.
-  const current = selected ?? threads[0];
-  const shown = filter === "requests" ? threads : threads.filter((t) => chats[t.id].length > 0);
-  const responseOf = (t: Thread): Response => responses[t.id] ?? "pending";
+  const select = (id: string | null) => router.replace(id ? `${pathname}?thread=${id}` : pathname, { scroll: false });
 
-  function open(t: Thread) {
-    setOpened((s) => new Set(s).add(t.id));
-    setDraft("");
-    router.replace(`${pathname}?thread=${t.id}`, { scroll: false });
+  if (ready && !signedIn) {
+    return (
+      <EmptyState
+        title="Sign in to see your requests"
+        body="Join requests, swap invites, and ring invites land here."
+        action={
+          <Link href="/" className={btn.primary}>
+            Sign in
+          </Link>
+        }
+        className="py-24"
+      />
+    );
   }
 
-  function onRespond(t: Thread, r: Exclude<Response, "pending">) {
-    respond(t.id, r);
-    if (r === "accepted") toast.success(t.kind === "join" ? `${t.name} joined` : `${kindLabel[t.kind]} accepted`);
-    else toast(`Declined`);
+  const items = inbox.data ?? [];
+  const shown = items.filter((i) => (filter === "requests" ? i.direction === "incoming" : i.direction === "outgoing"));
+  const selected = items.find((i) => i.id === selectedId) ?? null;
+  const pendingCount = items.filter((i) => i.actions.length > 0).length;
+
+  function replace(next: InboxItem) {
+    inbox.mutate((prev) => (prev ?? []).map((i) => (i.id === next.id ? next : i)));
   }
 
-  function send(e: React.FormEvent, t: Thread) {
-    e.preventDefault();
-    const text = draft.trim();
-    if (!text) return;
-    setChats((c) => ({ ...c, [t.id]: [...c[t.id], { from: "me", text }] }));
-    setDraft("");
+  async function respond(item: InboxItem, response: "accepted" | "declined") {
+    setBusy(true);
+    try {
+      if (item.kind === "collab") {
+        const res = await api<CollabOut>(`/collab-requests/${item.id}/respond`, { method: "POST", body: { status: response } });
+        replace({ ...item, status: res.status, actions: [] });
+      } else {
+        replace(await api<InboxItem>(`/cycle-invites/${item.id}/respond`, { method: "POST", body: { response } }));
+      }
+      toast.success(response === "accepted" ? "Accepted" : "Declined");
+      invalidate("/projects", "/me/cycles", "/feed");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
   }
 
-  const list = (
-    <ul className="divide-y divide-line">
-      {shown.map((t) => {
-        const active = t.id === current?.id;
-        const unread = !opened.has(t.id) && responseOf(t) === "pending";
-        const last = chats[t.id].at(-1);
-        const r = responseOf(t);
-        return (
-          <li key={t.id}>
-            <button
-              onClick={() => open(t)}
-              aria-current={active ? "true" : undefined}
-              className={cn("flex w-full gap-3 px-4 py-3.5 text-left transition-colors lg:px-5", active ? "lg:bg-sunken" : "hover:bg-sunken/60")}
-            >
-              <Faces thread={t} size={44} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className={cn("min-w-0 flex-1 truncate text-[15px]", unread ? "font-bold" : "font-semibold")}>{t.name}</p>
-                  <time className="font-mono text-[11px] text-muted-ink">{t.time}</time>
-                  {unread && <span className="size-2 rounded-full bg-teal" aria-label="Unread" />}
-                </div>
-                <p className={cn("truncate text-sm", unread ? "text-ink" : "text-muted-ink")}>
-                  {filter === "messages" && last ? `${last.from === "me" ? "You: " : ""}${last.text}` : t.summary}
-                </p>
-                <p
-                  className={cn(
-                    "mt-1 text-xs",
-                    r === "accepted" ? "text-teal" : r === "declined" ? "text-muted-ink" : t.kind === "join" ? "text-muted-ink" : "text-teal",
-                  )}
-                >
-                  {kindLabel[t.kind]}
-                  {r !== "pending" && ` · ${r}`}
-                </p>
-              </div>
-            </button>
-          </li>
-        );
-      })}
-      {shown.length === 0 && <li className="px-5 py-10 text-center text-sm text-muted-ink">No conversations yet.</li>}
-    </ul>
-  );
-
-  const pane = (t: Thread) => (
-    <>
-      <RingInviteCard thread={t} response={responseOf(t)} onRespond={(r) => onRespond(t, r)} />
-      <div className="flex flex-col gap-2 pt-1">
-        {chats[t.id].length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-ink">No messages yet. Say hi to {t.name}.</p>
-        ) : (
-          chats[t.id].map((m, i) => (
-            <p
-              key={i}
-              className={cn(
-                "max-w-[85%] rounded-xl px-3.5 py-2.5 text-[15px] leading-snug",
-                m.from === "me" ? "self-end bg-ink text-white" : "self-start bg-sunken text-ink",
-              )}
-            >
-              {m.text}
-            </p>
-          ))
-        )}
-      </div>
-      <form onSubmit={(e) => send(e, t)} className="flex gap-2 max-lg:sticky max-lg:bottom-16 max-lg:-mx-4 max-lg:border-t max-lg:border-line max-lg:bg-white max-lg:p-3">
-        <label className="sr-only" htmlFor={`msg-${t.id}`}>
-          Message {t.name}
-        </label>
-        <input
-          id={`msg-${t.id}`}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder={`Message ${t.name}`}
-          className="h-11 min-w-0 flex-1 rounded-lg border border-line px-3.5 text-[15px] outline-none placeholder:text-muted-ink focus:border-ink"
-        />
-        <button type="submit" disabled={!draft.trim()} aria-label="Send" className={cn(btn.primary, "h-11 w-11 px-0")}>
-          <SendHorizontal className="size-4" />
-        </button>
-      </form>
-    </>
+  const detail = selected && (
+    <div className="flex flex-col gap-4">
+      <header className="flex items-center gap-3">
+        <Faces people={selected.people} size={44} />
+        <div className="min-w-0">
+          <h2 className="truncate text-lg font-extrabold tracking-tight">
+            {selected.kind === "collab"
+              ? describe(selected).title
+              : `${selected.kind === "swap" ? "Swap" : "3-way ring"} with ${joinNames(selected.people.map(displayName))}`}
+          </h2>
+          <p className="text-[13px] text-muted-ink">
+            {selected.direction === "incoming" ? "Received" : "Sent"}{" "}
+            {ago(selected.created_at) === "now" ? "just now" : `${ago(selected.created_at)} ago`}
+          </p>
+        </div>
+      </header>
+      {selected.kind === "collab" ? (
+        <CollabCard item={selected} busy={busy} onRespond={(r) => respond(selected, r)} />
+      ) : (
+        <RingInviteCard item={selected} me={meProfile} busy={busy} onRespond={(r) => respond(selected, r)} />
+      )}
+    </div>
   );
 
   return (
-    <>
-      {/* Mobile: list, or one thread with a back button */}
-      <div className="lg:hidden">
+    <div className="lg:grid lg:min-h-dvh lg:grid-cols-[380px_minmax(0,1fr)]">
+      <aside className={cn("border-line lg:border-r", selected && "max-lg:hidden")}>
+        <header className="flex items-center justify-between gap-3 px-5 pb-3 pt-5">
+          <h1 className="text-2xl font-extrabold tracking-tight">
+            Inbox
+            {pendingCount > 0 && <span className="ml-2 text-base font-semibold text-teal">{pendingCount} to answer</span>}
+          </h1>
+          <FilterToggle value={filter} onChange={setFilter} />
+        </header>
+        {inbox.error ? (
+          <ErrorState error={inbox.error} onRetry={inbox.reload} />
+        ) : !inbox.data ? (
+          <RowsSkeleton rows={4} className="px-5 py-3" />
+        ) : shown.length === 0 ? (
+          <EmptyState
+            title={filter === "requests" ? "No requests yet" : "Nothing sent yet"}
+            body={
+              filter === "requests"
+                ? "When someone offers to help or invites you to a swap, it shows up here."
+                : "Offer to help on a project, or start a swap below."
+            }
+            action={
+              <Link href="/explore" className={btn.secondary}>
+                Find projects
+              </Link>
+            }
+          />
+        ) : (
+          <ul className="border-t border-line">
+            {shown.map((i) => (
+              <ItemRow key={i.id} item={i} active={i.id === selectedId} onOpen={() => select(i.id)} />
+            ))}
+          </ul>
+        )}
+        {cycles.data && meProfile && (
+          <CycleSuggestions
+            cycles={cycles.data}
+            items={items}
+            meId={meProfile.id}
+            onInvited={(item) => {
+              inbox.mutate((prev) => [item, ...(prev ?? [])]);
+              setFilter("sent");
+              select(item.id);
+            }}
+          />
+        )}
+      </aside>
+
+      <section className={cn("px-4 py-5 lg:px-8 lg:py-7", !selected && "max-lg:hidden")} aria-live="polite">
         {selected ? (
           <>
-            <header className="sticky top-0 z-30 flex min-h-14 items-center gap-2 border-b border-line bg-white px-2">
-              <button
-                aria-label="Back to inbox"
-                onClick={() => router.replace(pathname, { scroll: false })}
-                className="flex size-11 items-center justify-center"
-              >
-                <ChevronLeft className="size-6" />
-              </button>
-              <Faces thread={selected} size={32} />
-              <h1 className="min-w-0 flex-1 truncate text-base font-bold">{threadTitle(selected)}</h1>
-            </header>
-            <section className="flex flex-col gap-4 px-4 pt-4">{pane(selected)}</section>
+            <button onClick={() => select(null)} className={cn(btn.ghost, "-ml-2 mb-3 px-2 lg:hidden")}>
+              <ChevronLeft className="size-5" /> Inbox
+            </button>
+            {detail}
           </>
+        ) : selectedId && inbox.data ? (
+          <EmptyState title="That request is gone" body="It may have been withdrawn." />
         ) : (
-          <>
-            <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-white px-4">
-              <h1 className="text-xl font-extrabold tracking-tight">Inbox</h1>
-              <FilterToggle value={filter} onChange={setFilter} />
-            </header>
-            {list}
-          </>
+          <EmptyState title="Pick a request" body="Choose one on the left to see who's asking and answer it." className="hidden lg:flex" />
         )}
-      </div>
-
-      {/* Desktop: thread list and selected thread */}
-      <div className="hidden min-h-dvh lg:grid lg:grid-cols-[360px_minmax(0,1fr)]">
-        <aside className="border-r border-line">
-          <div className="flex items-center justify-between px-5 pb-4 pt-7">
-            <h1 className="text-2xl font-extrabold tracking-tight">Inbox</h1>
-            <FilterToggle value={filter} onChange={setFilter} />
-          </div>
-          <div className="border-t border-line">{list}</div>
-        </aside>
-
-        {current && (
-          <section className="flex max-w-[680px] flex-col gap-4 px-10 py-7" aria-label={threadTitle(current)}>
-            <header className="flex items-center gap-3">
-              <Faces thread={current} size={44} />
-              <div>
-                <h2 className="text-lg font-bold">{threadTitle(current)}</h2>
-                <Label>{current.time} ago</Label>
-              </div>
-            </header>
-            {pane(current)}
-          </section>
-        )}
-      </div>
-    </>
+      </section>
+    </div>
   );
 }

@@ -1,32 +1,47 @@
+"use client";
+
 import { Label } from "@/components/Meta";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { ActivityDay } from "@/lib/api-types";
+import { useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 
 const levels = ["#eef2f4", "#bfe5dd", "#7fcbbd", "#2f9e8c", "#0f766e"];
+const WEEKS = 52;
 
-/** Deterministic activity levels (0-4) per day, seeded by handle until /profiles/{handle}/activity is wired. */
-function activity(handle: string, weeks: number) {
-  let s = [...handle].reduce((a, c) => a * 31 + c.charCodeAt(0), 7) % 233280;
-  const rand = () => {
-    s = (s * 9301 + 49297) % 233280;
-    return s / 233280;
-  };
-  return Array.from({ length: weeks }, (_, w) =>
-    Array.from({ length: 7 }, () => {
-      // Busier toward recent weeks.
-      const r = rand() * (0.7 + (w / weeks) * 0.5);
-      return r < 0.35 ? 0 : r < 0.6 ? 1 : r < 0.78 ? 2 : r < 0.9 ? 3 : 4;
+function level(count: number) {
+  return count === 0 ? 0 : count === 1 ? 1 : count === 2 ? 2 : count <= 4 ? 3 : 4;
+}
+
+/** 52 columns of 7 days ending this week; each cell is that day's activity count. */
+function grid(days: ActivityDay[]) {
+  const counts = new Map(days.map((d) => [d.date, d.count]));
+  const today = new Date();
+  const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  const start = new Date(end);
+  start.setUTCDate(end.getUTCDate() - end.getUTCDay() - (WEEKS - 1) * 7);
+  return Array.from({ length: WEEKS }, (_, w) =>
+    Array.from({ length: 7 }, (_, d) => {
+      const day = new Date(start);
+      day.setUTCDate(start.getUTCDate() + w * 7 + d);
+      const key = day.toISOString().slice(0, 10);
+      return { key, count: day > end ? -1 : (counts.get(key) ?? 0) };
     }),
   );
 }
 
-/** GitHub-style heatmap: 52 weeks on desktop, the latest 26 on mobile. */
+/** GitHub-style heatmap from GET /profiles/{handle}/activity: 52 weeks on desktop, the latest 26 on mobile. */
 export function ContributionGraph({ handle }: { handle: string }) {
-  const weeks = activity(handle, 52);
-  const total = weeks.flat().reduce<number>((a, b) => a + b, 0);
+  const activity = useApi<ActivityDay[]>(`/profiles/${handle}/activity?weeks=${WEEKS}`);
+  if (activity.error) return null;
+  if (!activity.data) return <Skeleton className="h-24 w-full" />;
+
+  const weeks = grid(activity.data);
+  const total = activity.data.reduce((s, d) => s + d.count, 0);
   return (
     <section>
       <div className="mb-2.5 flex items-center justify-between">
-        <Label>{total} contributions this year</Label>
+        <Label>{total === 0 ? "No activity this year yet" : `${total} ${total === 1 ? "contribution" : "contributions"} this year`}</Label>
         <div className="flex items-center gap-1 text-xs text-muted-ink" aria-hidden>
           Less
           {levels.map((c) => (
@@ -37,9 +52,14 @@ export function ContributionGraph({ handle }: { handle: string }) {
       </div>
       <div role="img" aria-label={`${total} contributions in the last year`} className="flex justify-between gap-[3px]">
         {weeks.map((week, w) => (
-          <div key={w} className={cn("flex flex-1 flex-col gap-[3px]", w < 26 && "max-lg:hidden")}>
-            {week.map((lvl, d) => (
-              <span key={d} className="aspect-square w-full rounded-[2px]" style={{ background: levels[lvl] }} />
+          <div key={w} className={cn("flex flex-1 flex-col gap-[3px]", w < WEEKS - 26 && "max-lg:hidden")}>
+            {week.map((cell) => (
+              <span
+                key={cell.key}
+                title={cell.count >= 0 ? `${cell.count} on ${cell.key}` : undefined}
+                className="aspect-square w-full rounded-[2px]"
+                style={{ background: cell.count < 0 ? "transparent" : levels[level(cell.count)] }}
+              />
             ))}
           </div>
         ))}

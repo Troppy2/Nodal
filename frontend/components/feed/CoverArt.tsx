@@ -1,5 +1,5 @@
 import { tints } from "@/lib/cover";
-import type { Cover, CoverPattern } from "@/lib/types";
+import type { Cover, CoverPattern } from "@/lib/api-types";
 import { cn } from "@/lib/utils";
 
 // Deterministic per-project variation: the pattern and tint come from the API,

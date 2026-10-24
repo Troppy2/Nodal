@@ -1,6 +1,5 @@
 import { tints, typeLabel } from "@/lib/cover";
-import type { Project } from "@/lib/catalog";
-import type { ProjectType } from "@/lib/types";
+import type { ProjectCard, ProjectType } from "@/lib/api-types";
 import { cn } from "@/lib/utils";
 
 const stageLabel = { idea: "Idea", building: "Building", shipped: "Shipped" } as const;
@@ -10,21 +9,22 @@ export function DisciplineMark({ type, className }: { type: ProjectType; classNa
   return <span aria-hidden className={cn("inline-block size-2 shrink-0 rounded-[2px]", className)} style={{ background: tints[type].fg }} />;
 }
 
-/** One quiet line: disciplines (each with its color mark), stage, and source. Replaces stacks of pills. */
-export function ProjectMeta({ project, className }: { project: Pick<Project, "disciplines" | "stage" | "source">; className?: string }) {
+/** One quiet line: discipline (with its color mark), stage, and source. Replaces stacks of pills. */
+export function ProjectMeta({
+  project,
+  className,
+}: {
+  project: Pick<ProjectCard, "type" | "stage" | "source_access">;
+  className?: string;
+}) {
   return (
     <p className={cn("flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-ink", className)}>
       <span className="flex items-center gap-1.5">
-        {project.disciplines.map((d, i) => (
-          <span key={d} className="flex items-center gap-1.5">
-            {i > 0 && <span className="text-line">×</span>}
-            <DisciplineMark type={d} />
-            {typeLabel[d]}
-          </span>
-        ))}
+        <DisciplineMark type={project.type} />
+        {typeLabel[project.type]}
       </span>
       <span className={project.stage === "idea" ? "text-cool" : undefined}>{stageLabel[project.stage]}</span>
-      {project.source === "open" && <span>Open source</span>}
+      {project.source_access === "open" && <span>Open source</span>}
     </p>
   );
 }
