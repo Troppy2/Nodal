@@ -20,7 +20,7 @@ export function PostCard({ project }: { project: Project }) {
   const fit = peopleFit(project);
 
   return (
-    <article className="border-b border-line bg-white lg:overflow-hidden lg:rounded-xl lg:border">
+    <article className="focus-inset border-b border-line bg-white lg:overflow-hidden lg:rounded-xl lg:border">
       <header className="flex items-center gap-2.5 px-4 pb-3 pt-4">
         <Link href={`/u/${project.owner.handle}`}>
           <Avatar person={project.owner} size={32} />
@@ -34,8 +34,8 @@ export function PostCard({ project }: { project: Project }) {
         <time className="shrink-0 font-mono text-[11px] text-muted-ink">{project.posted}</time>
       </header>
 
-      <Link href={href} className="block" aria-label={project.title}>
-        <CoverArt cover={project.cover} seed={project.id} className="aspect-[2/1] lg:aspect-[5/2]" />
+      <Link href={href} className="group block" aria-label={project.title}>
+        <CoverArt cover={project.cover} seed={project.id} className="aspect-[2/1] lg:aspect-[5/2] transition-[filter] duration-150 group-hover:brightness-[0.96]" />
       </Link>
 
       <div className="px-4 pb-3 pt-3.5">
@@ -45,7 +45,7 @@ export function PostCard({ project }: { project: Project }) {
         <ProjectMeta project={project} className="mt-1.5" />
         <p className="mt-2 text-[15px] leading-relaxed text-ink/90">{project.summary}</p>
         {(project.stage === "idea" && (project.badges.market_verdict || project.badges.cool_score !== undefined)) && (
-          <p className="mt-2 flex gap-4 font-mono text-[11px] uppercase tracking-wider text-muted-ink">
+          <p className="mt-2 flex gap-4 text-xs text-muted-ink">
             {project.badges.market_verdict && (
               <span>
                 Market <span className="text-teal">{project.badges.market_verdict}</span>
@@ -62,7 +62,7 @@ export function PostCard({ project }: { project: Project }) {
 
       {project.needs.length > 0 && (
         <div className="border-t border-line">
-          <p className="px-4 pt-3 font-mono text-[11px] uppercase tracking-wider text-muted-ink">
+          <p className="px-4 pt-3 text-xs text-muted-ink">
             Looking for · {fit} {fit === 1 ? "person fits" : "people fit"}
           </p>
           <NeedRows project={project} className="mt-1" />

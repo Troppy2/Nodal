@@ -145,9 +145,22 @@
     @apply font-sans;
   }
 }
+/* Focus: one 3px blue outline for every keyboard-focused control. Mouse clicks don't show it. */
 *:focus-visible {
   outline: 3px solid #2563eb;
   outline-offset: 2px;
+}
+/* Fields: the border turns ink and the outline hugs the field. */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline-offset: 0;
+  border-color: var(--color-ink);
+}
+/* Inside clipped containers (cards, file tables, covers) draw the outline inward so it is never cut off. */
+.focus-inset:focus-visible,
+.focus-inset :focus-visible {
+  outline-offset: -3px;
 }
 
 /* No drop shadows anywhere: one hairline border instead. Rings (selection, focus) still compose. */
@@ -165,5 +178,17 @@
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+  }
+}
+
+/* Phones and tablets: no visible scroll bars; scrolling still works. */
+@media (max-width: 1023px) {
+  html,
+  body,
+  * {
+    scrollbar-width: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
   }
 }

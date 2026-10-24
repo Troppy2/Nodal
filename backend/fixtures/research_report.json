@@ -1,0 +1,113 @@
+{
+  "report": {
+    "verdict": "mixed",
+    "confidence": "low",
+    "summary": "People buy plant sensors, but few pay for a sensor alone. No direct competitor sells the music angle in the sources found. That could mean a small market or an open one.",
+    "competitors": [
+      {
+        "name": "Consumer soil sensors",
+        "what": "Track moisture, send alerts, no sound.",
+        "fact_ids": [
+          "f1"
+        ]
+      },
+      {
+        "name": "Plant-care apps",
+        "what": "Reminders and identification, software only.",
+        "fact_ids": [
+          "f2"
+        ]
+      },
+      {
+        "name": "Generative music toys",
+        "what": "Playful, but not tied to a living plant.",
+        "fact_ids": [
+          "f3"
+        ]
+      }
+    ],
+    "demand_signals": [
+      {
+        "text": "Plant communities ask for sensors that are fun to look at, not only useful.",
+        "fact_ids": [
+          "f2"
+        ]
+      }
+    ],
+    "market_size": [],
+    "business_models": [],
+    "risks": [
+      {
+        "text": "Hardware cost and shipping make a small production run expensive.",
+        "fact_ids": [
+          "f1"
+        ]
+      }
+    ],
+    "next_steps": [
+      "Build one working unit and show it to five plant owners.",
+      "Test whether people pay for the music or the sensor."
+    ]
+  },
+  "sources": [
+    {
+      "id": "s1",
+      "url": "https://example.com",
+      "title": "Soil sensors compared",
+      "fact_ids": [
+        "f1"
+      ]
+    },
+    {
+      "id": "s2",
+      "url": "https://example.com/plants",
+      "title": "Plant community thread",
+      "fact_ids": [
+        "f2"
+      ]
+    },
+    {
+      "id": "s3",
+      "url": "https://example.com/audio",
+      "title": "Generative music toys",
+      "fact_ids": [
+        "f3"
+      ]
+    }
+  ],
+  "cool": {
+    "overall": 8.0,
+    "measures": [
+      {
+        "key": "novelty",
+        "score": 8,
+        "reason": "Plant sensors are common; turning them into music is not."
+      },
+      {
+        "key": "demo_appeal",
+        "score": 9,
+        "reason": "Water the plant and the room changes. It demos in ten seconds."
+      },
+      {
+        "key": "fun_to_build",
+        "score": 8,
+        "reason": "Firmware, sound, and art each get a clear piece to own."
+      },
+      {
+        "key": "scope",
+        "score": 7,
+        "reason": "One sensor and a synth patch fit a weekend; the enclosure may not."
+      }
+    ],
+    "why": "A living plant you can hear is instantly shareable. The main risk is the sound design: it has to stay pleasant for hours."
+  },
+  "steps": [
+    "Planning searches",
+    "Searching: soil moisture sensor music",
+    "Reading: example.com",
+    "Extracting facts",
+    "Writing report",
+    "Scoring cool factor"
+  ],
+  "note": "Sample report (demo data). Sources are placeholders."
+}

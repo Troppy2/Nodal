@@ -33,7 +33,7 @@ export function TabStrip<T extends string>({
           className={cn(
             "-mb-px flex min-h-11 items-center justify-center gap-1.5 border-b-2 text-[15px] transition-colors",
             fill && "flex-1",
-            value === t.id ? "border-ink font-bold text-ink" : "border-transparent font-medium text-muted-ink hover:text-ink",
+            value === t.id ? "border-ink font-bold text-ink" : "border-transparent font-medium text-muted-ink hover:border-line hover:text-ink",
           )}
         >
           {t.label}

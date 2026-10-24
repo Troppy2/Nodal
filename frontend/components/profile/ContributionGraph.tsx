@@ -27,7 +27,7 @@ export function ContributionGraph({ handle }: { handle: string }) {
     <section>
       <div className="mb-2.5 flex items-center justify-between">
         <Label>{total} contributions this year</Label>
-        <div className="flex items-center gap-1 font-mono text-[10px] uppercase text-muted-ink" aria-hidden>
+        <div className="flex items-center gap-1 text-xs text-muted-ink" aria-hidden>
           Less
           {levels.map((c) => (
             <span key={c} className="size-2.5 rounded-[2px]" style={{ background: c }} />

@@ -7,6 +7,7 @@ import { Avatar } from "@/components/Avatar";
 import { me } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
 import { isActive, navItems } from "./nav";
+import { NavPending } from "./NavPending";
 
 // Same five destinations as the rail; Home, Explore, Create, Inbox, Profile in thumb order.
 const order = ["/feed", "/explore", "/create", "/inbox", "/u/me"];
@@ -27,7 +28,7 @@ export function TabBar() {
             href={href}
             aria-label={label}
             aria-current={active ? "page" : undefined}
-            className="flex h-11 min-w-11 items-center justify-center"
+            className="relative flex h-11 min-w-11 items-center justify-center rounded-lg transition-colors active:bg-sunken"
           >
             {href === "/create" ? (
               <span className="flex h-9 w-12 items-center justify-center rounded-xl bg-ink text-white">
@@ -40,6 +41,7 @@ export function TabBar() {
                 <Avatar person={me} size={28} />
               </span>
             )}
+            <NavPending className="-bottom-1 left-1/2 w-5 -translate-x-1/2" />
           </Link>
         );
       })}

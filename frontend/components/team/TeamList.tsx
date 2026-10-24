@@ -29,14 +29,14 @@ export function TeamList({
             <div className="min-w-0 flex-1 leading-tight">
               <p className="flex items-baseline gap-2 text-[15px]">
                 <span className="truncate font-semibold">{owner && editable ? "You" : m.person.name}</span>
-                <span className={cn("font-mono text-[10px] uppercase tracking-wider", invited ? "text-cool" : "text-muted-ink")}>
+                <span className={cn("text-xs", invited ? "text-cool" : "text-muted-ink")}>
                   {owner ? "owner" : m.status}
                 </span>
               </p>
               <p className="mt-0.5 truncate text-sm text-muted-ink">{m.skills}</p>
             </div>
             {invited ? (
-              <span className="font-mono text-[11px] uppercase tracking-wider text-muted-ink">Share after joining</span>
+              <span className="text-xs text-muted-ink">Share after joining</span>
             ) : editable ? (
               <label className="flex h-10 items-center rounded-lg border border-line pr-2.5 font-mono text-[15px] focus-within:border-ink">
                 <span className="sr-only">Share for {owner ? "you" : first}, percent</span>

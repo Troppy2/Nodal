@@ -121,7 +121,7 @@ export function InboxView({ threads }: { threads: Thread[] }) {
                 </p>
                 <p
                   className={cn(
-                    "mt-1 font-mono text-[10px] uppercase tracking-wider",
+                    "mt-1 text-xs",
                     r === "accepted" ? "text-teal" : r === "declined" ? "text-muted-ink" : t.kind === "join" ? "text-muted-ink" : "text-teal",
                   )}
                 >

@@ -77,10 +77,10 @@ export function PeopleGraph({
             onClick={() => onSelect(n.person.handle)}
             aria-pressed={active}
             aria-label={`${n.person.name}, fills ${n.skills.join(", ")}${n.kind ? `, ${n.kind}` : ""}`}
-            className="absolute flex -translate-x-1/2 -translate-y-[30%] flex-col items-center gap-1 rounded-xl p-1"
+            className="group absolute flex -translate-x-1/2 -translate-y-[30%] flex-col items-center gap-1 rounded-xl p-1"
             style={{ left: `${n.x}%`, top: `${n.y}%` }}
           >
-            <span className={cn("rounded-full p-[3px] transition-shadow", active ? "ring-2 ring-ink" : "ring-2 ring-transparent")}>
+            <span className={cn("rounded-full p-[3px] transition-shadow", active ? "ring-2 ring-ink" : "ring-2 ring-transparent group-hover:ring-line")}>
               <span
                 className="flex size-12 items-center justify-center rounded-full border-2 text-sm font-bold"
                 style={{ color: fg, background: bg, borderColor: n.kind ? TEAL : fg }}
@@ -90,11 +90,11 @@ export function PeopleGraph({
             </span>
             <span className="flex flex-col items-center bg-white/90 px-1 leading-tight">
               <span className={cn("text-xs", active ? "font-bold" : "font-semibold")}>{name}</span>
-              <span className="max-w-[140px] truncate font-mono text-[10px] uppercase tracking-wider text-muted-ink">
+              <span className="max-w-[140px] truncate text-xs text-muted-ink">
                 {n.skills[0]}
                 {n.skills.length > 1 && ` +${n.skills.length - 1}`}
               </span>
-              {n.kind && <span className="font-mono text-[10px] font-medium uppercase tracking-wider text-teal">{n.kind}</span>}
+              {n.kind && <span className="text-xs font-medium text-teal">{n.kind}</span>}
             </span>
           </button>
         );
@@ -105,7 +105,7 @@ export function PeopleGraph({
 
 export function GraphLegend({ cycles }: { cycles: boolean }) {
   return (
-    <p className="flex flex-wrap justify-center gap-x-4 gap-y-1 font-mono text-[10px] uppercase tracking-wider text-muted-ink">
+    <p className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-muted-ink">
       {(["software", "hardware", "creative"] as const).map((t) => (
         <span key={t} className="flex items-center gap-1.5">
           <DisciplineMark type={t} /> {t}

@@ -9,7 +9,7 @@ export function LanguageBar({ languages }: { languages: { name: string; pct: num
           <span key={l.name} style={{ width: `${l.pct}%`, background: shades[i % shades.length] }} />
         ))}
       </div>
-      <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11px] uppercase tracking-wider text-muted-ink">
+      <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-ink">
         {languages.map((l, i) => (
           <li key={l.name} className="flex items-center gap-1.5">
             <span className="size-2 rounded-[2px]" style={{ background: shades[i % shades.length] }} />

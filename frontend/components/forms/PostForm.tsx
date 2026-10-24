@@ -101,7 +101,7 @@ export function PostForm() {
         {/* Preview */}
         <aside className="px-4 pt-5 lg:sticky lg:top-8 lg:h-fit lg:px-0 lg:pt-0">
           <Label className="mb-2 max-lg:hidden">Preview</Label>
-          <div className="overflow-hidden rounded-xl border border-line">
+          <div className="focus-inset overflow-hidden rounded-xl border border-line">
             <CoverArt cover={cover} seed={seed} coverUrl={coverUrl} className="aspect-[2/1]" />
             <div className="p-4">
               <p className="truncate text-lg font-extrabold leading-tight tracking-[-0.02em]">{title.trim() || "Untitled"}</p>

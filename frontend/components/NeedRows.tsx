@@ -31,11 +31,11 @@ export function NeedRows({ project, className }: { project: Project; className?:
               <p className="truncate text-[13px] text-muted-ink">{n.note}</p>
             </div>
             {fits ? (
-              <span className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-teal">{sent ? "Requested" : "You fit"}</span>
+              <span className="shrink-0 text-xs text-teal">{sent ? "Requested" : "You fit"}</span>
             ) : others.length > 0 ? (
               <AvatarStack people={others} />
             ) : (
-              <span className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-muted-ink">No match yet</span>
+              <span className="shrink-0 text-xs text-muted-ink">No match yet</span>
             )}
           </li>
         );

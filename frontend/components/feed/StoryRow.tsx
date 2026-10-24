@@ -23,7 +23,7 @@ export function StoryRow() {
           <Avatar person={person} size={48} ring={tag !== null} />
           <span className="flex flex-col items-center leading-tight">
             <span className="text-xs font-medium">{person.handle}</span>
-            <span className={cn("font-mono text-[10px] uppercase tracking-wider", tag ? "text-teal" : "text-transparent")}>
+            <span className={cn("text-xs", tag ? "text-teal" : "text-transparent")}>
               {tag ?? "·"}
             </span>
           </span>

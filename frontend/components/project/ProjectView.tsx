@@ -124,7 +124,7 @@ export function ProjectView({ project, initialTab }: { project: Project; initial
 
 function ReadmePanel({ markdown }: { markdown: string }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-line">
+    <section className="focus-inset overflow-hidden rounded-xl border border-line">
       <h2 className="border-b border-line bg-sunken px-4 py-2 font-mono text-[12px]">README.md</h2>
       <div className="px-5 py-2 lg:px-6">
         <Readme markdown={markdown} />
@@ -151,7 +151,7 @@ function NeedsTab({ project, owner }: { project: Project; owner: boolean }) {
               <p className="flex flex-wrap items-baseline gap-x-2 font-semibold">
                 {n.skill}
                 {n.bounty_tolken && <span className="font-mono text-xs font-medium text-teal">{formatTolken(n.bounty_tolken)} bounty</span>}
-                {fits && <span className="font-mono text-[11px] uppercase tracking-wider text-teal">You fit</span>}
+                {fits && <span className="text-xs text-teal">You fit</span>}
               </p>
               <p className="text-sm text-muted-ink">{n.note}</p>
               <div className="mt-2 flex items-center gap-2 text-[13px] text-muted-ink">
@@ -310,7 +310,7 @@ function About({ project }: { project: Project }) {
         <dl className="mt-4 flex flex-col gap-1 font-mono text-[12px]">
           {facts.map(([v, k]) => (
             <div key={String(k)} className="flex justify-between border-b border-dashed border-line pb-1">
-              <dt className="uppercase tracking-wider text-muted-ink">{k}</dt>
+              <dt className="text-muted-ink">{k}</dt>
               <dd>{v}</dd>
             </div>
           ))}
@@ -330,7 +330,7 @@ function About({ project }: { project: Project }) {
               <Link href={`/u/${p.handle}`} className="flex items-center gap-2.5 text-sm hover:underline">
                 <Avatar person={p} size={28} />
                 <span className="font-semibold">{p.handle}</span>
-                {p.handle === project.owner.handle && <span className="font-mono text-[10px] uppercase tracking-wider text-muted-ink">owner</span>}
+                {p.handle === project.owner.handle && <span className="text-xs text-muted-ink">owner</span>}
               </Link>
             </li>
           ))}

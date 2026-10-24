@@ -48,7 +48,7 @@ export function RingInviteCard({
   const accept = thread.kind === "ring" ? "Accept ring" : thread.kind === "swap" ? "Accept swap" : "Accept";
 
   return (
-    <div className="overflow-hidden rounded-xl border border-line">
+    <div className="focus-inset overflow-hidden rounded-xl border border-line">
       <Label className="border-b border-line bg-sunken px-4 py-2.5">
         {thread.kind === "ring" ? "3-way ring" : thread.kind === "swap" ? "Skill swap" : "Join request"} · {thread.time} ago
       </Label>
@@ -77,7 +77,7 @@ export function RingInviteCard({
               {thread.kind !== "join" && (
                 <span
                   className={cn(
-                    "shrink-0 font-mono text-[10px] uppercase tracking-wider",
+                    "shrink-0 text-xs",
                     status === "accepted" ? "text-teal" : status === "declined" ? "text-cool" : "text-muted-ink",
                   )}
                 >

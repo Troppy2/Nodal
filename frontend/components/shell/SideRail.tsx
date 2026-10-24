@@ -7,6 +7,7 @@ import { me } from "@/lib/catalog";
 import { InboxBadge } from "./InboxBadge";
 import { cn } from "@/lib/utils";
 import { Logo } from "./Logo";
+import { NavPending } from "./NavPending";
 import { isActive, navItems } from "./nav";
 
 export function SideRail() {
@@ -24,7 +25,7 @@ export function SideRail() {
             href={href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "flex min-h-11 items-center gap-3.5 rounded-xl px-3 text-[15px] text-ink transition-colors",
+              "relative flex min-h-11 items-center gap-3.5 rounded-xl px-3 text-[15px] text-ink transition-colors",
               active ? "bg-sunken font-bold" : "font-medium hover:bg-sunken",
             )}
           >
@@ -35,6 +36,7 @@ export function SideRail() {
             )}
             <span className="flex-1">{label}</span>
             {href === "/inbox" && <InboxBadge />}
+            <NavPending className="left-0 top-1/2 h-5 w-[3px] -translate-y-1/2" />
           </Link>
         );
       })}

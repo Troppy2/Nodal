@@ -18,8 +18,7 @@ export default function LandingPage() {
 
       <main className="mx-auto grid max-w-[1100px] items-center gap-10 px-5 pb-16 pt-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-16 lg:pt-16">
         <section>
-          <p className="font-mono text-[11px] uppercase tracking-wider text-muted-ink">Software × Hardware × Creative</p>
-          <h1 className="mt-4 text-[40px] font-extrabold leading-[1.02] tracking-[-0.035em] text-ink sm:text-[56px]">
+          <h1 className="text-[40px] font-extrabold leading-[1.02] tracking-[-0.035em] text-ink sm:text-[56px]">
             Find the people your project is missing.
           </h1>
           <p className="mt-5 max-w-[46ch] text-[17px] leading-relaxed text-ink/80">

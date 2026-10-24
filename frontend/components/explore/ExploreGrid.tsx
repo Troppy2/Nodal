@@ -76,7 +76,7 @@ export function ExploreGrid() {
         })}
       </div>
 
-      <p className="font-mono text-[11px] uppercase tracking-wider text-muted-ink" aria-live="polite">
+      <p className="text-xs text-muted-ink" aria-live="polite">
         {shown.length} {shown.length === 1 ? "project" : "projects"}
         {query && <> matching “{q.trim()}”</>}
       </p>

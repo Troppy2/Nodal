@@ -66,7 +66,7 @@ export function OnboardingWizard() {
               <span key={s.id} className={cn("h-1 flex-1 rounded-full", i <= step ? "bg-ink" : "bg-line")} />
             ))}
           </div>
-          <p className="mt-2 font-mono text-[11px] uppercase tracking-wider text-muted-ink">
+          <p className="mt-2 text-xs text-muted-ink">
             Step {step + 1} of {steps.length}
           </p>
         </div>

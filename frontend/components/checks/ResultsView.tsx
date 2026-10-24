@@ -191,7 +191,7 @@ export function ResultsView({ project }: { project: Project }) {
           {isIdea && (
             <section
               aria-label="Checks"
-              className={cn("px-4 py-5 lg:block lg:overflow-hidden lg:rounded-xl lg:border lg:border-line lg:p-0", shownTab === "people" && "hidden")}
+              className={cn("focus-inset px-4 py-5 lg:block lg:overflow-hidden lg:rounded-xl lg:border lg:border-line lg:p-0", shownTab === "people" && "hidden")}
             >
               <TabStrip<CheckId>
                 fill

@@ -110,7 +110,7 @@ export function ProfileView({ handle }: { handle: Handle }) {
             <h1 className="text-2xl font-extrabold leading-tight tracking-[-0.02em] lg:text-[28px]">{person.name}</h1>
             <p className="font-mono text-[13px] text-muted-ink">@{handle}</p>
             <p className="mt-2 max-w-lg text-[15px] leading-relaxed max-lg:hidden">{bios[handle]}</p>
-            <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1 font-mono text-[12px] uppercase tracking-wider text-muted-ink">
+            <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-muted-ink">
               {facts.map(([n, label]) => (
                 <div key={label} className="flex items-baseline gap-1.5">
                   <dd className="text-[13px] font-medium text-ink">{n}</dd>
@@ -151,7 +151,7 @@ export function ProfileView({ handle }: { handle: Handle }) {
                 {cycles.map((c) => (
                   <li key={c.thread}>
                     <Link href={`/inbox?thread=${c.thread}`} className="flex items-center gap-3 py-2.5 hover:bg-sunken">
-                      <span className="w-10 font-mono text-[11px] uppercase tracking-wider text-teal">{c.kind}</span>
+                      <span className="w-10 text-xs text-teal">{c.kind}</span>
                       <span className="min-w-0 flex-1 truncate text-sm">{c.text}</span>
                       <span className="text-[13px] font-semibold">Open</span>
                     </Link>
@@ -192,7 +192,7 @@ export function ProfileView({ handle }: { handle: Handle }) {
                     </div>
                     <span
                       className={cn(
-                        "font-mono text-[11px] uppercase tracking-wider",
+                        "text-xs",
                         e.status === "Released" ? "text-teal" : "text-muted-ink",
                       )}
                     >

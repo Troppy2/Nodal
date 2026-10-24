@@ -94,9 +94,9 @@ export function CollabDialog({
                   <span className="block text-[13px] text-muted-ink">{n.note}</span>
                 </span>
                 {sent ? (
-                  <span className="font-mono text-[11px] uppercase text-teal">Sent</span>
+                  <span className="text-xs text-teal">Sent</span>
                 ) : (
-                  fits && <span className="font-mono text-[11px] uppercase text-teal">You offer this</span>
+                  fits && <span className="text-xs text-teal">You offer this</span>
                 )}
               </label>
             );

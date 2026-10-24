@@ -20,7 +20,7 @@ function Toggle({
       aria-checked={checked}
       aria-label={label}
       onClick={() => onChange(!checked)}
-      className="flex h-11 w-14 shrink-0 items-center justify-center"
+      className="flex h-11 w-14 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-opacity hover:opacity-85"
     >
       <span
         className={cn(

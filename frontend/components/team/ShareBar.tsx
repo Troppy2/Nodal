@@ -19,7 +19,7 @@ export function ShareBar({ segments, className }: { segments: { bps: number; col
 
 export function ShareTotal({ bps }: { bps: number }) {
   return (
-    <span aria-live="polite" className={cn("font-mono text-[11px] uppercase tracking-wider", bps === 10000 ? "text-muted-ink" : "text-cool")}>
+    <span aria-live="polite" className={cn("text-xs", bps === 10000 ? "text-muted-ink" : "text-cool")}>
       Total {bps / 100}%{bps !== 10000 && (bps > 10000 ? " · over" : " · under")}
     </span>
   );

@@ -10,7 +10,7 @@ export function ProjectTile({ project, showOwner = true }: { project: Project; s
   const href = project.stage === "idea" && project.owner.handle === me.handle ? `/projects/${project.id}/results` : `/projects/${project.id}`;
   return (
     <Link href={href} className="group flex flex-col">
-      <CoverArt cover={project.cover} seed={project.id} className="aspect-[4/3] rounded-lg" />
+      <CoverArt cover={project.cover} seed={project.id} className="aspect-[4/3] rounded-lg transition-[filter] duration-150 group-hover:brightness-[0.96]" />
       <h3 className="mt-2.5 text-[15px] font-bold leading-tight group-hover:underline">{project.title}</h3>
       <ProjectMeta project={project} className="mt-1 gap-x-2 text-[10px]" />
       {project.needs.length > 0 ? (

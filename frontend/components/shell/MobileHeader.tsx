@@ -16,7 +16,7 @@ export function MobileHeader({
   return (
     <header className="sticky top-0 z-30 flex min-h-14 items-center gap-2 border-b border-line bg-white px-2 py-2 lg:hidden">
       {back !== null && (
-        <Link href={back} aria-label="Back" className="flex size-11 items-center justify-center">
+        <Link href={back} aria-label="Back" className="flex size-11 items-center justify-center rounded-lg transition-colors hover:bg-sunken active:bg-sunken">
           <ChevronLeft className="size-6" />
         </Link>
       )}

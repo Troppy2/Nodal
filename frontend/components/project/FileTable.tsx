@@ -13,7 +13,7 @@ export function FileTable({ files, author }: { files: FileRow[]; author: Person 
   const rows = [...files.filter((f) => f.kind === "folder"), ...files.filter((f) => f.kind === "file")];
   const latest = files[0];
   return (
-    <div className="overflow-hidden rounded-xl border border-line">
+    <div className="focus-inset overflow-hidden rounded-xl border border-line">
       <div className="flex items-center gap-3 border-b border-line bg-sunken px-3 py-2 lg:px-4">
         <span className="rounded-md border border-line bg-white px-2 py-0.5 font-mono text-[12px]">main</span>
         <Avatar person={author} size={20} className="hidden sm:flex" />
@@ -32,7 +32,7 @@ export function FileTable({ files, author }: { files: FileRow[]; author: Person 
       </div>
       <ul>
         {rows.map((f) => (
-          <li key={f.name} className="flex min-h-11 items-center gap-3 border-b border-line px-3 last:border-b-0 lg:px-4">
+          <li key={f.name} className="flex min-h-11 items-center gap-3 border-b border-line px-3 transition-colors last:border-b-0 hover:bg-sunken/60 lg:px-4">
             {f.kind === "folder" ? (
               <Folder className="size-4 shrink-0 fill-muted-ink/30 text-muted-ink" aria-label="Folder" />
             ) : (

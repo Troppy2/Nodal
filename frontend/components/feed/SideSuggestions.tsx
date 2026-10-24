@@ -44,7 +44,7 @@ export function SideSuggestions() {
                 <div className="min-w-0 flex-1 leading-snug">
                   <p className="flex items-baseline justify-between gap-2 text-sm font-semibold">
                     {person.handle}
-                    <span className="font-mono text-[10px] font-medium uppercase tracking-wider text-teal">{kind}</span>
+                    <span className="text-xs font-medium text-teal">{kind}</span>
                   </p>
                   <p className="flex items-center gap-1 truncate text-[13px] text-muted-ink">
                     {gives} <ArrowLeftRight className="size-3 shrink-0" /> {gets}
