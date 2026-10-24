@@ -16,9 +16,10 @@ def _jwks() -> jwt.PyJWKClient:
 
 def _verify(token: str) -> dict:
     """Supabase signs user tokens with an asymmetric key (ES256/RS256, published as JWKS);
-    older projects use the HS256 JWT secret. Accept either, always with audience "authenticated"."""
+    older projects use the HS256 JWT secret. Accept either, always with audience "authenticated".
+    HS256 is refused when no secret is configured, so a guessable default can never sign tokens."""
     alg = jwt.get_unverified_header(token).get("alg")
-    if alg == "HS256":
+    if alg == "HS256" and settings.supabase_jwt_secret:
         key = settings.supabase_jwt_secret
     elif alg in ("ES256", "RS256"):
         key = _jwks().get_signing_key_from_jwt(token).key

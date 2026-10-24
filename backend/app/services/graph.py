@@ -116,7 +116,8 @@ def project_graph(snap: Snapshot, project_id: str, depth: int) -> dict:
         # projects owned by the last ring of people, so a three-person ring can close
         for prof in [n["id"] for n in nodes.values() if n["kind"] == "profile" and n["depth"] == depth]:
             for owned in snap.owned.get(prof, []):
-                if any(n["project_id"] == owned for n in snap.needs) and len(nodes) < MAX_NODES:
+                # no size check here: the cap below trims, and keeps whole cycles first
+                if any(n["project_id"] == owned for n in snap.needs):
                     add_project(owned, depth)
                     add_owns(prof, owned)
         # fills edges between nodes already present
@@ -129,13 +130,21 @@ def project_graph(snap: Snapshot, project_id: str, depth: int) -> dict:
                     if e.project_id in present and ("fills", u, e.project_id) not in edges:
                         add_fill(e)
 
-    # cap nodes: keep root, its owner, then by depth and best edge score
+    # cap nodes: keep root, its owner, then the best cycles' people and projects (up to half the cap,
+    # so a seeded ring survives a crowd of single fillers), then by depth and best edge score
     if len(nodes) > MAX_NODES:
         best: dict[str, int] = {}
         for ed in edges.values():
             for k in (ed["source"], ed["target"]):
                 best[k] = max(best.get(k, 0), ed["_score"])
-        keep = sorted(nodes, key=lambda k: (k not in (project_id, root["owner_id"]), nodes[k]["depth"], -best.get(k, 0)))
+        present = set(nodes)
+        in_cycle: set[str] = set()
+        for c in sorted(detect_cycles(snap), key=lambda c: -c["score"]):
+            part = set(c["members"]) | {e.project_id for e in c["links"]}
+            if part <= present and len(in_cycle | part) <= MAX_NODES // 2:
+                in_cycle |= part
+        keep = sorted(nodes, key=lambda k: (k not in (project_id, root["owner_id"]), k not in in_cycle,
+                                            nodes[k]["depth"], -best.get(k, 0)))
         keep_set = set(keep[:MAX_NODES])
         nodes = {k: v for k, v in nodes.items() if k in keep_set}
         edges = {k: v for k, v in edges.items() if v["source"] in keep_set and v["target"] in keep_set}
