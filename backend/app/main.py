@@ -4,7 +4,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from . import errors
+from . import errors, keycheck
 from .config import settings
 from .limits import limiter
 from .routers import (
@@ -41,6 +41,7 @@ app = FastAPI(title="Nodal API")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 errors.install(app)
+keycheck.check()
 app.add_middleware(InvalidateOnWrite)
 app.add_middleware(SlugMiddleware)
 app.add_middleware(

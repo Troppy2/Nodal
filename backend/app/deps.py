@@ -1,5 +1,8 @@
+import logging
+import ssl
 from functools import lru_cache
 
+import certifi
 import jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -7,11 +10,18 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from .config import settings
 
 bearer = HTTPBearer(auto_error=False)
+log = logging.getLogger("nodal")
+# Supabase stamps "issued at" with its clock; a laptop a few seconds behind would otherwise reject
+# a token it just received as "not yet valid".
+CLOCK_SKEW_S = 60
 
 
 @lru_cache
 def _jwks() -> jwt.PyJWKClient:
-    return jwt.PyJWKClient(f"{settings.supabase_url}/auth/v1/.well-known/jwks.json", cache_keys=True)
+    # certifi's CA bundle: python.org builds on macOS ship without system certificates, so urllib's
+    # default context can't verify supabase.co and every login fails.
+    return jwt.PyJWKClient(f"{settings.supabase_url}/auth/v1/.well-known/jwks.json", cache_keys=True,
+                           ssl_context=ssl.create_default_context(cafile=certifi.where()))
 
 
 def _verify(token: str) -> dict:
@@ -25,7 +35,7 @@ def _verify(token: str) -> dict:
         key = _jwks().get_signing_key_from_jwt(token).key
     else:
         raise jwt.InvalidAlgorithmError(alg)
-    return jwt.decode(token, key, algorithms=[alg], audience="authenticated")
+    return jwt.decode(token, key, algorithms=[alg], audience="authenticated", leeway=CLOCK_SKEW_S)
 
 
 def _user(creds: HTTPAuthorizationCredentials | None) -> dict | None:
@@ -33,7 +43,8 @@ def _user(creds: HTTPAuthorizationCredentials | None) -> dict | None:
         return None
     try:
         payload = _verify(creds.credentials)
-    except (jwt.PyJWTError, jwt.PyJWKClientError):
+    except (jwt.PyJWTError, jwt.PyJWKClientError) as exc:
+        log.warning("Rejected bearer token: %s: %s", type(exc).__name__, exc)
         raise HTTPException(401, "Invalid token")
     return {"id": payload["sub"], "jwt": creds.credentials}
 

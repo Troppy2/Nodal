@@ -40,7 +40,7 @@ def test_jwt_missing_invalid_wrong_aud_expired():
     assert client.get(url, headers={"Authorization": "Bearer junk"}).status_code == 401
     assert client.get(url, headers=auth(aud="anon")).status_code == 401
     assert client.get(url, headers=auth(secret="x" * 40)).status_code == 401
-    assert client.get(url, headers=auth(exp=-10)).status_code == 401
+    assert client.get(url, headers=auth(exp=-120)).status_code == 401
     # a bad token on a public endpoint is still rejected rather than silently ignored
     assert client.get(f"{P}/feed", headers={"Authorization": "Bearer junk"}).status_code == 401
 
