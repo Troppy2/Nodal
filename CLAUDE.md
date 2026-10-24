@@ -13,6 +13,7 @@ Read the relevant one before changing that side of the app.
 - No money anywhere. Tolken (`◈`) is the in-app currency; bounties are funded and released in Tolken. No checkout, prices, or payouts.
 - Ideas and projects are one entity, separated by `stage`. Market and cool-factor checks are for ideas only; projects show people who fit.
 - Onboarding (`/onboarding`, three steps) collects skills, interests, and follows — the inputs matching reads.
+- Invites are DMs: an owner's project invite and the follow-up are messages in one thread (`messages` table). Don't add a separate notification path.
 
 ## Layout
 

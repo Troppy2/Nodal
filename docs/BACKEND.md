@@ -533,9 +533,24 @@ create table cycle_invite_members (
   primary key (invite_id, profile_id)
 );
 
+-- direct messages: an invite to a project is a message, and the follow-up is a nudge
+create table messages (
+  id uuid primary key default gen_random_uuid(),
+  from_profile_id uuid not null references profiles(id) on delete cascade,
+  to_profile_id uuid not null references profiles(id) on delete cascade,
+  project_id uuid references projects(id) on delete set null,
+  kind text not null default 'text' check (kind in ('text','invite','nudge')),
+  body text not null check (char_length(body) between 1 and 2000),
+  read_at timestamptz,
+  created_at timestamptz not null default now(),
+  check (from_profile_id <> to_profile_id)
+);
+create index messages_from_idx on messages (from_profile_id, created_at desc);
+create index messages_to_idx on messages (to_profile_id, created_at desc);
+
 ```
 
-RLS: `project_stars` and `follows` are readable by everyone and writable where the actor is the row's profile. `project_members` is readable by everyone and written by FastAPI only. `cycle_invites` and `cycle_invite_members` are readable by participants and written through FastAPI.
+RLS: `project_stars` and `follows` are readable by everyone and writable where the actor is the row's profile. `project_members` is readable by everyone and written by FastAPI only. `cycle_invites` and `cycle_invite_members` are readable by participants and written through FastAPI. `messages` is readable by its two participants (`from_profile_id = auth.uid()` or `to_profile_id = auth.uid()`) and inserted only by the sender.
 
 **Endpoints**
 
@@ -548,6 +563,11 @@ RLS: `project_stars` and `follows` are readable by everyone and writable where t
 | GET /profiles/{handle} | No | Profile with offers, interests, stats (projects, stars received, collaborations, followers), pinned projects, swaps and rings summary (own profile only) |
 | GET /profiles/{handle}/activity?weeks=52 | No | Daily counts for the heatmap: posts, comments, collab requests, source uploads, and accepted collaborations, summed per day. Return `{date, count}` for days with activity only |
 | GET /me/inbox | Yes | Requests: collab requests, swap invites, and ring invites in one list, newest first, each with `kind`, people involved, links, and my available actions |
+| GET /me/conversations | Yes | One row per person I have DMed: profile, project, last body and kind, `mine`, `unread` |
+| GET /messages/{profile_id} | Yes | The thread between us, oldest first. Marks incoming unread messages read. Returns `project` and `can_nudge` |
+| POST /messages | Yes | Send a text DM `{to_profile_id, body, project_id?}` |
+| POST /messages/{profile_id}/invite | Owner | Invite someone to my project as a DM `{project_id, skill_id?, body?}`. 409 while an invite is unanswered |
+| POST /messages/{profile_id}/nudge | Yes | One follow-up on my unanswered invite: "Have you seen it?" 409 when there is nothing to follow up |
 | POST /cycles/invite | Yes | Create a swap or ring invite from a cycle I am in: `{cycle_links}`. Creates `cycle_invites` and member rows (my response is accepted) |
 | POST /cycle-invites/{id}/respond | Yes | `{response: accepted or declined}`. When every member has accepted, set `status` to accepted and create `project_members` rows (status joined, role contributor, skill from the link) on each project that has a need filled |
 | GET /projects/{id}/team | Yes (member) | Members with role, skill, `share_bps`, and status, plus the sum of shares |
@@ -586,6 +606,16 @@ Return `{file_count, skipped_count}`. A re-upload deletes the old rows and zip f
 **Download (`GET /projects/{id}/source/download`):** create a signed URL for the zip, valid 60 seconds, with the service-role client and return `{url}`. Never return the storage path.
 
 **Delete (`DELETE /projects/{id}/source`):** owner only; removes rows, zip, and resets `source_zip_path`.
+
+## Direct messages (`routers/messages.py`)
+
+An invite to a project is a DM, not a separate notification: `messages.kind = 'invite'` carries the project and optional skill. The owner's confirmation screen and the invitee's inbox show the same row, so there is nothing to reconcile.
+
+- **Invite:** owner only (`project.owner_id = me`), never yourself. Rejects a second invite while the last message in the thread is still my unanswered invite (409). Body defaults to "Hi {first} — I'm building {project} and could use your {skill}."
+- **Nudge:** allowed only when the latest message in the thread is my `invite`; it inserts one `kind = 'nudge'` message and then stops, so the owner cannot spam.
+- **Thread:** two queries (each direction), sorted by `created_at`; opening it marks the other side's messages read. `can_nudge` is true only when the latest message is my invite.
+- **Conversations:** grouped by the other profile in Python, with unread counts from `to_profile_id = me and read_at is null`.
+- **Limits:** 30 messages/minute, 20 invites/minute. Both participants see the row; nobody else can.
 
 ## Tolken (`routers/tolken.py`, `services/tolken_service.py`)
 

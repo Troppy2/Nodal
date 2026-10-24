@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Link2, Loader2, Pencil, X } from "lucide-react";
+import { Link2, Loader2, MessageCircle, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar } from "@/components/Avatar";
 import { ProjectGrid } from "@/components/explore/ProjectTile";
@@ -103,7 +103,16 @@ function Profile({ handle }: { handle: string }) {
     [p.stats.followers, p.stats.followers === 1 ? "follower" : "followers"],
   ];
 
-  const actions = own ? <OwnActions handle={p.profile.handle} /> : <FollowButton profile={p} mutate={profile.mutate} />;
+  const actions = own ? (
+    <OwnActions handle={p.profile.handle} />
+  ) : (
+    <>
+      <FollowButton profile={p} mutate={profile.mutate} />
+      <Link href={`/inbox?thread=m:${p.profile.id}`} className={btn.secondary}>
+        <MessageCircle className="size-4" /> Message
+      </Link>
+    </>
+  );
 
   return (
     <>
