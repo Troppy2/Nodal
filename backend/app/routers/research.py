@@ -18,7 +18,7 @@ def _readable(run: dict, user: dict | None) -> dict:
 @router.post("/projects/{project_id}/research", response_model=ResearchStart)
 def start(project_id: str, body: ResearchIn, tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
     """Owner of an idea only. Same idea text and checks within 24h returns the cached run.
-    Live mode is not implemented yet, so every run uses the stored sample (labeled is_sample)."""
+    RESEARCH_MODE=fixture returns the stored sample (labeled is_sample); live runs TinyFish + the LLM."""
     rows = service_client().table("projects").select("*").eq("id", project_id).execute().data
     if not rows:
         raise HTTPException(404, "Project not found")
@@ -35,7 +35,10 @@ def start(project_id: str, body: ResearchIn, tasks: BackgroundTasks, user: dict 
     if rs.runs_today(user["id"]) >= settings.research_runs_per_day:
         raise HTTPException(429, f"You can run {settings.research_runs_per_day} checks a day. Try again tomorrow.")
     run = rs.create_run(project_id, user["id"], ihash, checks)
-    tasks.add_task(rs.run_fixture, run["id"], checks)
+    if settings.research_mode == "fixture":
+        tasks.add_task(rs.run_fixture, run["id"], checks)
+    else:
+        tasks.add_task(rs.run_live, run["id"], project, checks)
     return {"id": run["id"], "status": run["status"], "cached": False}
 
 

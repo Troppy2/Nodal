@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from ..config import settings
 from ..db import service_client
 from ..deps import get_current_user, get_optional_user
+from ..ratelimit import rate_limit
 from ..models import SourceFileOut, SourceTree
 from ..services import source_service
 from .projects import get_project_row, require_owner
@@ -11,7 +12,8 @@ router = APIRouter()
 
 
 @router.post("/projects/{project_id}/source")
-async def upload_source(project_id: str, file: UploadFile = File(...), user: dict = Depends(get_current_user)) -> dict:
+async def upload_source(project_id: str, file: UploadFile = File(...),
+                        user: dict = Depends(rate_limit("5/hour", "source-upload"))) -> dict:
     project = require_owner(project_id, user)
     if project["source_access"] != "open":
         raise HTTPException(409, "Set source access to open before uploading")

@@ -180,3 +180,35 @@ COMMENTS = [
     ("dungeon-drift", "rin", "I can do engine loops that don't grate after an hour."),
     ("study-quest", "sam", "The map screen could double as the progress bar."),
 ]
+
+
+# 100 generated demo profiles so matching, "people who fit" and onboarding suggestions look lived-in.
+# They offer skills (levels 1-2, so the seeded demo people still rank first) and follow seeded people,
+# but own no projects, so they add matches without adding swaps or rings that would crowd the demo.
+_FIRST = ["Ava", "Ben", "Chloe", "Diego", "Elif", "Farah", "Gabe", "Hana", "Ivan", "Jade", "Kofi", "Lena", "Malik",
+          "Nora", "Omar", "Priya", "Quinn", "Ravi", "Sofia", "Theo", "Uma", "Vik", "Wren", "Xia", "Yusuf", "Zoe"]
+_LAST = ["Abe", "Bauer", "Chen", "Diaz", "Eze", "Fischer", "Garcia", "Haddad", "Ito", "Jensen", "Kim", "Lopez",
+         "Mensah", "Novak", "Okoro", "Patel", "Quist", "Rossi", "Silva", "Tanaka", "Ueda", "Varga", "Wong", "Yilmaz"]
+_BIOS = {"software": "Writes software and likes shipping small things.",
+         "hardware": "Builds hardware and solders on weekends.",
+         "creative": "Makes art, sound, and stories for other people's projects."}
+
+
+def generated_people(n: int = 100, seed: int = 2026) -> dict:
+    import random
+
+    rng = random.Random(seed)
+    tags = sorted({t for p in PROJECTS.values() for t in p["tags"]})
+    out = {}
+    for i in range(n):
+        first, last = rng.choice(_FIRST), rng.choice(_LAST)
+        handle = f"{first.lower()}{last.lower()}{i + 1:02d}"
+        category = rng.choice(list(SKILLS))
+        picks = rng.sample(SKILLS[category], 2) + rng.sample([s for c in SKILLS for s in SKILLS[c]], 1)
+        offers = [(s, rng.choice([1, 1, 2])) for s in dict.fromkeys(picks)]
+        out[handle] = (f"{first} {last}", _BIOS[category], rng.sample(tags, 3), rng.choice([20, 40, 60, 100]), offers)
+    return out
+
+
+GENERATED = generated_people()
+GENERATED_FOLLOWS = [(h, target) for i, h in enumerate(GENERATED) for target in list(PEOPLE)[i % len(PEOPLE):][:2]]

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ..db import service_client, user_client
 from ..deps import get_current_user
+from ..ratelimit import rate_limit
 from ..models import CollabIn, CollabOut, RespondIn
 from ..services.cards import profile_lite, profiles_by_id, skill_out, skills_by_id
 from .projects import get_project_row
@@ -34,7 +35,7 @@ def collab_out(rows: list[dict]) -> list[dict]:
 
 
 @router.post("/projects/{project_id}/collab-requests", response_model=CollabOut, status_code=201)
-def create_request(project_id: str, body: CollabIn, user: dict = Depends(get_current_user)):
+def create_request(project_id: str, body: CollabIn, user: dict = Depends(rate_limit("10/minute", "collab"))):
     project = get_project_row(project_id)
     if project["owner_id"] == user["id"]:
         raise HTTPException(409, "You own this project")

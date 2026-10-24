@@ -5,14 +5,16 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .limits import limiter
+from .slugs import SlugMiddleware
 from .routers import (
-    auth, collab, comments, feed, graph, inbox, matches, me, profiles, projects, recommendations, research,
+    auth, collab, comments, feed, graph, ideas, inbox, matches, me, profiles, projects, recommendations, research,
     skills, social, source, team, tolken,
 )
 
 app = FastAPI(title="Nodal API")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlugMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.frontend_origin],
@@ -28,6 +30,6 @@ def health():
 
 for module in (
     auth, projects, skills, comments, collab, social, profiles, me, source,
-    matches, graph, feed, recommendations, inbox, team, tolken, research,
+    matches, graph, feed, recommendations, ideas, inbox, team, tolken, research,
 ):
     app.include_router(module.router, prefix="/api/v1")

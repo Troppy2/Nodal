@@ -4,6 +4,7 @@ from ..db import service_client, user_client
 from ..deps import get_current_user, get_optional_user
 from ..models import NeedIn, ProjectDetail, ProjectIn, ProjectList, ProjectPatch
 from ..services import source_service
+from ..slugs import unique_slug
 from ..services.cards import load_cards, profile_lite, profiles_by_id, skill_out, skills_by_id
 
 router = APIRouter()
@@ -118,7 +119,7 @@ def get_project(project_id: str, viewer: dict | None = Depends(get_optional_user
 def create_project(body: ProjectIn, user: dict = Depends(get_current_user)):
     sb = user_client(user["jwt"])
     row = sb.table("projects").insert({
-        "owner_id": user["id"], "type": body.type, "title": body.title.strip(), "summary": body.summary.strip(),
+        "owner_id": user["id"], "slug": unique_slug(body.title), "type": body.type, "title": body.title.strip(), "summary": body.summary.strip(),
         "readme_md": body.readme_md, "stage": body.stage, "repo_url": body.repo_url, "demo_url": body.demo_url,
     }).execute().data[0]
     pid = row["id"]

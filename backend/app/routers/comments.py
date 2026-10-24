@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..db import service_client, user_client
-from ..deps import get_current_user
+from ..ratelimit import rate_limit
 from ..models import CommentIn, CommentOut
 from ..services.cards import profile_lite, profiles_by_id
 from .projects import get_project_row
@@ -25,7 +25,7 @@ def list_comments(project_id: str):
 
 
 @router.post("/projects/{project_id}/comments", response_model=CommentOut, status_code=201)
-def add_comment(project_id: str, body: CommentIn, user: dict = Depends(get_current_user)):
+def add_comment(project_id: str, body: CommentIn, user: dict = Depends(rate_limit("10/minute", "comments"))):
     get_project_row(project_id)
     text = body.body.strip()
     if not text:
