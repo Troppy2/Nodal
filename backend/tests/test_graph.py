@@ -4,6 +4,7 @@ from functools import lru_cache
 
 import pytest
 
+from app.config import settings
 from app.db import service_client
 from app.services import research_service
 
@@ -139,6 +140,9 @@ def test_tolken_fund_rejects_low_balance(client, swap_user):
 
 
 def test_research_fixture_run_caches_and_limits(client, swap_user, monkeypatch):
+    # Pin fixture mode: this test asserts the stored sample is returned, so it must not depend on
+    # RESEARCH_MODE in the developer's .env (live mode would hit TinyFish + the LLM).
+    monkeypatch.setattr(settings, "research_mode", "fixture")
     monkeypatch.setattr(research_service, "STEP_DELAY_S", 0)
     h, pid = swap_user["headers"], swap_user["project_id"]
     start = client.post(f"{P}/projects/{pid}/research", json={"checks": ["market", "cool"]}, headers=h)
