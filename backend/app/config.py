@@ -6,7 +6,8 @@ class Settings(BaseSettings):
 
     supabase_url: str = ""
     supabase_anon_key: str = ""
-    supabase_jwt_secret: str = "dev-secret-change-me-dev-secret-change-me"
+    # Only for projects still on the legacy HS256 secret. Leave empty to accept only JWKS-signed tokens.
+    supabase_jwt_secret: str = ""
     supabase_service_key: str = ""
     frontend_origin: str = "http://localhost:3000"
     # Name-only sign-in (POST /auth/name): anyone who types a name signs in as that person.

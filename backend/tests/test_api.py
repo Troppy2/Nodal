@@ -75,3 +75,9 @@ def test_stories_shape(new_user):
     for s in r.json():
         assert set(s) == {"profile", "tag", "trade"}
         assert s["tag"] in ("swap", "ring", None)
+
+
+def test_hs256_refused_without_secret(monkeypatch):
+    tok = token(secret="dev-secret-change-me-dev-secret-change-me")
+    monkeypatch.setattr(settings, "supabase_jwt_secret", "")
+    assert client.get(f"{P}/feed/stories", headers={"Authorization": f"Bearer {tok}"}).status_code == 401

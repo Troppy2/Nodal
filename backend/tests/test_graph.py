@@ -1,22 +1,21 @@
 """Group B: graph, cycles, stories, inbox invites, team, Tolken, research. Runs against local Supabase + seed."""
 
-import time
+from functools import lru_cache
 
-import jwt
 import pytest
 
-from app.config import settings
 from app.db import service_client
 from app.services import research_service
+
+from .conftest import session_headers
 
 P = "/api/v1"
 
 
+@lru_cache
 def headers_for(profile_id: str) -> dict:
-    """Seeded people have no password; mint a token for them with the local JWT secret (HS256 is accepted)."""
-    tok = jwt.encode({"sub": profile_id, "aud": "authenticated", "role": "authenticated", "exp": int(time.time()) + 600},
-                     settings.supabase_jwt_secret, algorithm="HS256")
-    return {"Authorization": f"Bearer {tok}"}
+    """A real session for a seeded person, cached so the run stays under Supabase's verify rate limit."""
+    return session_headers(profile_id)
 
 
 def skill_id(name: str) -> int:
@@ -31,7 +30,7 @@ def swap_user(new_user, seeded):
     u = new_user()
     sb.table("profile_offers").insert({"profile_id": u["id"], "skill_id": skill_id("Python backend"), "level": 3}).execute()
     proj = sb.table("projects").insert({
-        "owner_id": u["id"], "type": "software", "title": "Test Idea", "summary": "A test idea", "stage": "idea",
+        "owner_id": u["id"], "slug": f"test-idea-{u['id'][:8]}", "type": "software", "title": "Test Idea", "summary": "A test idea", "stage": "idea",
     }).execute().data[0]
     sb.table("project_needs").insert({"project_id": proj["id"], "skill_id": skill_id("UI design"), "note": "screens",
                                       "bounty_tolken": 30}).execute()
