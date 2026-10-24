@@ -110,3 +110,27 @@ def test_world_reload_waits_for_invalidate(monkeypatch):
     world_mod.world()
     assert len(loads) == 2
     world_mod.invalidate()                      # leave no fake world behind for other tests
+
+
+def test_keycheck_names_the_bad_key(monkeypatch):
+    import base64
+    import json
+
+    from app import keycheck
+
+    def jwt_for(role, ref="abc"):
+        body = base64.urlsafe_b64encode(json.dumps({"role": role, "ref": ref}).encode()).decode().rstrip("=")
+        return f"eyJhbGciOiJIUzI1NiJ9.{body}.sig"
+
+    monkeypatch.setattr(settings, "supabase_url", "https://abc.supabase.co")
+    monkeypatch.setattr(settings, "supabase_anon_key", jwt_for("anon"))
+    monkeypatch.setattr(settings, "supabase_service_key", jwt_for("service_role"))
+    assert keycheck.problems() == []
+    monkeypatch.setattr(settings, "supabase_service_key", jwt_for("anon"))
+    assert "SUPABASE_SERVICE_KEY is the 'anon' key" in keycheck.problems()[0]
+    monkeypatch.setattr(settings, "supabase_service_key", jwt_for("service_role")[:30])
+    assert "cut off" in keycheck.problems()[0]
+    monkeypatch.setattr(settings, "supabase_service_key", "sb_secret_xyz")
+    assert "legacy JWT key" in keycheck.problems()[0]
+    monkeypatch.setattr(settings, "supabase_service_key", jwt_for("service_role", ref="other"))
+    assert "belongs to project 'other'" in keycheck.problems()[0]

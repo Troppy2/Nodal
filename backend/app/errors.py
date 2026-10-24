@@ -10,6 +10,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from postgrest.exceptions import APIError
 
+from . import keycheck
+
 log = logging.getLogger("nodal")
 
 PG_STATUS = {
@@ -26,6 +28,15 @@ PG_STATUS = {
 def install(app: FastAPI) -> None:
     @app.exception_handler(APIError)
     async def postgrest_error(request: Request, exc: APIError):
+        if str(exc.code) == "401":
+            # Supabase's gateway refused the API key itself (not a user's token): a server config problem
+            found = keycheck.problems()
+            log.error("Supabase rejected the server's API key on %s %s. %s", request.method, request.url.path,
+                      "; ".join(found) if found else
+                      "SUPABASE_ANON_KEY and SUPABASE_SERVICE_KEY look well formed, so one is probably from another "
+                      "project or was rotated: copy both again from Project Settings > API Keys > Legacy API keys")
+            return JSONResponse({"detail": "The server's database key was rejected. Check the backend log."},
+                                status_code=503)
         status, detail = PG_STATUS.get(str(exc.code), (502, "The database rejected that request"))
         if status == 502:
             log.error("PostgREST error on %s %s: %s %s", request.method, request.url.path, exc.code, exc.message)
