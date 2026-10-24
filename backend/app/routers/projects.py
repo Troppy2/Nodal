@@ -33,10 +33,12 @@ def project_detail(project_id: str, viewer_id: str | None) -> dict:
     members = sb.table("project_members").select("*").eq("project_id", project_id).order("created_at").execute().data
     people = profiles_by_id([m["profile_id"] for m in members])
     skills = skills_by_id()
+    # Revenue shares are team-only (GET /projects/{id}/team); everyone else sees who is on the team, not the split.
+    is_member = bool(viewer_id) and any(m["profile_id"] == viewer_id for m in members)
     card["members"] = [
         {"profile": profile_lite(people[m["profile_id"]]), "role": m["role"],
          "skill": skill_out(skills[m["skill_id"]]) if m.get("skill_id") else None,
-         "share_bps": m.get("share_bps"), "status": m["status"]}
+         "share_bps": m.get("share_bps") if is_member else None, "status": m["status"]}
         for m in members if m["profile_id"] in people
     ]
     card["viewer_follows_owner"] = bool(viewer_id) and bool(

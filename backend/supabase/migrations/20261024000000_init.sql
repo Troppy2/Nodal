@@ -99,7 +99,7 @@ create table source_contents (
 create table research_runs (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references projects(id) on delete cascade,
-  requested_by uuid not null references profiles(id),
+  requested_by uuid not null references profiles(id) on delete cascade,
   status text not null default 'queued'
     check (status in ('queued','running','done','partial','failed')),
   steps jsonb not null default '[]',   -- [{at, label}], shown live in the UI
@@ -140,8 +140,8 @@ create table tolken_ledger (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references projects(id) on delete cascade,
   need_id uuid not null references project_needs(id) on delete cascade,
-  owner_id uuid not null references profiles(id),
-  contributor_id uuid references profiles(id),
+  owner_id uuid not null references profiles(id) on delete cascade,
+  contributor_id uuid references profiles(id) on delete set null,
   amount_tolken int not null check (amount_tolken > 0),
   status text not null default 'pending_funding'
     check (status in ('pending_funding','funded','released','refunded','cancelled')),
@@ -204,7 +204,7 @@ create table project_members (
 
 create table cycle_invites (
   id uuid primary key default gen_random_uuid(),
-  created_by uuid not null references profiles(id),
+  created_by uuid not null references profiles(id) on delete cascade,
   kind text not null check (kind in ('swap','ring')),
   links jsonb not null,                -- same shape as /me/cycles links
   status text not null default 'pending' check (status in ('pending','accepted','declined')),
@@ -252,6 +252,9 @@ create policy source_contents_read on source_contents for select using (true);
 create policy stars_read on project_stars for select using (true);
 create policy follows_read on follows for select using (true);
 create policy members_read on project_members for select using (true);
+-- share_bps is team-only; the API returns it to members through GET /projects/{id}/team
+revoke select on project_members from anon, authenticated;
+grant select (project_id, profile_id, role, skill_id, status, created_at) on project_members to anon, authenticated;
 
 -- projects: owner writes. owner_id and the source_* bookkeeping are set by FastAPI with the service role.
 create policy projects_insert on projects for insert with check (owner_id = auth.uid());
