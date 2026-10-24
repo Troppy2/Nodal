@@ -20,6 +20,7 @@ router = APIRouter()
 
 # Accounts need an email internally; these addresses are never shown or sent to.
 EMAIL_DOMAIN = "users.nodal.local"
+PATTERN_CHARS = re.compile(r"[*%_\\,()]")
 
 
 class NameIn(BaseModel):
@@ -44,9 +45,11 @@ def _find_profile(name: str) -> dict | None:
     by_handle = sb.table("profiles").select("id,handle").eq("handle", _slug(name)).limit(1).execute().data
     if by_handle:
         return by_handle[0]
-    # Escape LIKE wildcards so "%" or "_" can't match someone else's name.
-    literal = name.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
-    by_name = sb.table("profiles").select("id,handle").ilike("display_name", literal).order("created_at").limit(1).execute().data
+    # ilike is only an exact, case-insensitive match when the name has no pattern characters
+    # (PostgREST treats * % _ \ and its own , ( ) specially). Such names never match an existing person.
+    if PATTERN_CHARS.search(name):
+        return None
+    by_name = sb.table("profiles").select("id,handle").ilike("display_name", name).order("created_at").limit(1).execute().data
     return by_name[0] if by_name else None
 
 

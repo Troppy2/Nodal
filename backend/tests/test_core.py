@@ -232,7 +232,8 @@ def test_sign_in_with_name_finds_existing_and_creates_new(client):
 
 
 def test_sign_in_name_wildcards_do_not_match_others(client):
-    r = client.post("/api/v1/auth/name", json={"name": "%"})
-    assert r.status_code == 200 and r.json()["created"] is True
     from app.db import service_client
-    service_client().auth.admin.delete_user(r.json()["user_id"])
+    for pattern in ["%", "*", "M*", "_aya*"]:
+        r = client.post("/api/v1/auth/name", json={"name": pattern})
+        assert r.status_code == 200 and r.json()["created"] is True, pattern
+        service_client().auth.admin.delete_user(r.json()["user_id"])
