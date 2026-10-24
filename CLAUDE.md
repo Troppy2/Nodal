@@ -28,7 +28,7 @@ Read the relevant one before changing that side of the app.
 Backend (from `backend/`):
 ```
 .venv\Scripts\activate
-uvicorn app.main:app --reload     # http://localhost:8000/docs
+uvicorn app.main:app --reload --port 8010   # http://localhost:8010/docs
 pytest
 ```
 

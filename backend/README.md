@@ -1,11 +1,13 @@
 # Nodal backend
 
+Full local setup for the whole app (Supabase, this API, and the Next.js frontend): **[../docs/RUNNING.md](../docs/RUNNING.md)**.
+
 ```
 python -m venv .venv
 .venv\Scripts\activate        # Windows (source .venv/bin/activate elsewhere)
 pip install -r requirements.txt
 copy .env.example .env        # fill in Supabase values
-uvicorn app.main:app --reload # http://localhost:8000/docs
+uvicorn app.main:app --reload --port 8010 # http://localhost:8010/docs
 pytest
 ```
 
