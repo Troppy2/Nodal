@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { EmptyState, ErrorState, SignInPrompt } from "@/components/project/states";
+import { EmptyState, ErrorState } from "@/components/project/states";
 import { TabStrip } from "@/components/Tabs";
 import { api } from "@/lib/api";
 import type { FeedResponse, ProjectCard } from "@/lib/api-types";
@@ -65,7 +65,7 @@ function FeedList({ tab }: { tab: Tab }) {
 
   if (loading && !data) {
     return (
-      <div className="flex flex-col lg:gap-5 lg:pt-5">
+      <div className="flex flex-col gap-3 pt-3 lg:gap-5 lg:pt-4">
         <PostCardSkeleton />
         <PostCardSkeleton />
       </div>
@@ -82,7 +82,7 @@ function FeedList({ tab }: { tab: Tab }) {
     );
   }
   return (
-    <div className="flex flex-col lg:gap-5 lg:pt-5">
+    <div className="flex flex-col gap-3 pt-3 lg:gap-5 lg:pt-4">
       {items.map((p) => (
         <PostCard key={p.id} project={p} />
       ))}
@@ -102,6 +102,7 @@ export function FeedTabs() {
   const [tab, setTab] = useState<Tab>("for_you");
   const { ready, signedIn } = useSession();
 
+  const guest = ready && !signedIn;
   return (
     <section>
       <TabStrip
@@ -114,9 +115,28 @@ export function FeedTabs() {
         ]}
         className="px-4 max-lg:[&>button]:flex-1 lg:gap-7 lg:px-0"
       />
-      {tab === "following" && ready && !signedIn ? (
-        <div className="p-4 lg:px-0">
-          <SignInPrompt>Sign in to see projects from people you follow.</SignInPrompt>
+      {!ready ? (
+        <div className="px-4 pt-3 lg:px-0 lg:pt-4">
+          <PostCardSkeleton />
+        </div>
+      ) : guest ? (
+        <div className="px-4 pt-3 lg:px-0 lg:pt-4">
+          <EmptyState
+            action={
+              <div className="flex flex-wrap justify-center gap-2">
+                <Link href="/" className={btn.primary}>
+                  Sign in
+                </Link>
+                <Link href="/explore" className={btn.secondary}>
+                  Explore projects
+                </Link>
+              </div>
+            }
+          >
+            {tab === "following"
+              ? "Sign in to see projects from people you follow."
+              : "Sign in with your name to post, follow people, and get matched with the projects that need you."}
+          </EmptyState>
         </div>
       ) : (
         <FeedList key={`${tab}-${signedIn}`} tab={tab} />

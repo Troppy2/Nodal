@@ -34,22 +34,24 @@ export function Avatar({
   className?: string;
 }) {
   const { fg, bg } = tints[tintFor(person.id)];
-  const style = dashed
-    ? { width: size, height: size, fontSize: size * 0.36, color: "#5b6b78" }
-    : { width: size, height: size, fontSize: size * 0.36, color: fg, background: bg };
   const inner = (
     <span
       aria-hidden
-      style={style}
+      style={{ width: size, height: size, fontSize: size * 0.36, color: dashed ? "#5b6b78" : fg, background: dashed ? undefined : bg }}
       className={cn(
         "flex shrink-0 select-none items-center justify-center rounded-full font-bold",
         dashed && "border-2 border-dashed border-muted-ink/60",
-        ring === undefined && className,
+        !ring && className,
       )}
     >
       {initials(person)}
     </span>
   );
-  if (ring === undefined) return inner;
-  return <span className={cn("rounded-full border-[3px] p-[3px]", ring ? "border-teal" : "border-line", className)}>{inner}</span>;
+  if (!ring) return inner;
+  // A thin teal ring with a white gap reads as "swap or ring" without crowding neighbours.
+  return (
+    <span className={cn("inline-flex shrink-0 rounded-full ring-2 ring-teal ring-offset-2 ring-offset-white", className)}>
+      {inner}
+    </span>
+  );
 }
