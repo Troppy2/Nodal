@@ -348,7 +348,7 @@ export function PostForm() {
             />
           </div>
 
-          {stage === "idea" && (
+          {stage === "building" && (
             <div>
               <label htmlFor="readme" className="mb-2 block text-sm font-semibold">
                 README <span className="font-normal text-muted-ink">(optional, markdown)</span>
