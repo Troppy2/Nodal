@@ -333,6 +333,50 @@ class InviteRespondIn(BaseModel):
     response: Literal["accepted", "declined"]
 
 
+# ---------- direct messages: invites and follow-ups live in the same thread ----------
+
+MessageKind = Literal["text", "invite", "nudge"]
+
+
+class MessageIn(BaseModel):
+    to_profile_id: str
+    body: str = Field(min_length=1, max_length=2000)
+    project_id: str | None = None
+
+
+class InviteIn(BaseModel):
+    project_id: str
+    skill_id: int | None = None
+    body: str | None = Field(default=None, max_length=1000)
+
+
+class MessageOut(BaseModel):
+    id: str
+    body: str
+    kind: MessageKind
+    mine: bool
+    created_at: str
+    read_at: str | None = None
+
+
+class ConversationOut(BaseModel):
+    profile: ProfileLite
+    project: ProjectLiteRef | None = None
+    last_body: str
+    last_kind: MessageKind
+    last_at: str
+    # Whether the last message is mine.
+    mine: bool
+    unread: int
+
+
+class ThreadOut(BaseModel):
+    profile: ProfileLite
+    project: ProjectLiteRef | None = None
+    messages: list[MessageOut]
+    can_nudge: bool
+
+
 class TeamOut(BaseModel):
     members: list[Member]
     total_bps: int

@@ -68,37 +68,35 @@ export function SignInForm() {
   }
 
   return (
-    <form onSubmit={submit} className="flex w-full max-w-[420px] flex-col gap-2" noValidate>
+    <form onSubmit={submit} className="flex w-full flex-col gap-2" noValidate>
       <label htmlFor="name" className="text-sm font-semibold">
         Your name
       </label>
-      <div className="flex gap-2 max-sm:flex-col">
-        <input
-          id="name"
-          value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-            if (error) setError(null);
-          }}
-          maxLength={60}
-          autoComplete="name"
-          placeholder="Ada Lovelace"
-          aria-invalid={Boolean(error)}
-          aria-describedby={error ? "name-error" : "name-hint"}
-          className="h-12 min-w-0 flex-1 rounded-lg border border-line px-4 text-[15px] outline-none placeholder:text-muted-ink hover:border-ink/30 focus:border-ink aria-invalid:border-red-600"
-        />
-        <button type="submit" disabled={pending} className={cn(btn.primary, "h-12 px-6 text-[15px]")}>
-          {pending && <Loader2 className="size-4 animate-spin" />}
-          Sign in
-        </button>
-      </div>
+      <input
+        id="name"
+        value={name}
+        onChange={(e) => {
+          setName(e.target.value);
+          if (error) setError(null);
+        }}
+        maxLength={60}
+        autoComplete="name"
+        placeholder="Ada Lovelace"
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? "name-error" : "name-hint"}
+        className="h-12 w-full rounded-lg border border-line px-4 text-[15px] outline-none placeholder:text-muted-ink hover:border-ink/30 focus:border-ink aria-invalid:border-red-600"
+      />
+      <button type="submit" disabled={pending} className={cn(btn.primary, "h-12 w-full text-[15px]")}>
+        {pending && <Loader2 className="size-4 animate-spin" />}
+        Sign in
+      </button>
       {error ? (
         <p id="name-error" className="text-[13px] text-red-700">
           {error}
         </p>
       ) : (
         <p id="name-hint" className="text-[13px] text-muted-ink">
-          No email or password. Your session stays in this browser.
+          Your session stays in this browser.
         </p>
       )}
     </form>

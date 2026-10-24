@@ -138,7 +138,7 @@ function PeoplePanel({ project, viewerId, own }: { project: ProjectDetail; viewe
         <GraphLegend cycles={nodes.some((n) => n.kind)} />
       </div>
       <div className="mt-5 border-t border-line pt-5">
-        <PersonDetail node={node} isOwner={own} viewerId={viewerId} />
+        <PersonDetail node={node} isOwner={own} viewerId={viewerId} project={project} />
       </div>
     </>
   );

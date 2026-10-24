@@ -1,16 +1,33 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
+import { Check } from "lucide-react";
 import { Avatar } from "@/components/Avatar";
 import { firstName } from "@/components/checks/States";
+import type { ProjectDetail } from "@/lib/api-types";
 import { btn } from "@/lib/styles";
 import { cn } from "@/lib/utils";
 import type { PersonNode } from "./graph-data";
+import { InviteDialog } from "./InviteDialog";
 
 /** Why the selected person fits, with the one primary action. */
-export function PersonDetail({ node, isOwner, viewerId }: { node: PersonNode; isOwner: boolean; viewerId: string | null }) {
+export function PersonDetail({
+  node,
+  isOwner,
+  viewerId,
+  project,
+}: {
+  node: PersonNode;
+  isOwner: boolean;
+  viewerId: string | null;
+  project: Pick<ProjectDetail, "id" | "title" | "needs">;
+}) {
   const { profile } = node;
   const isMe = profile.id === viewerId;
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [invited, setInvited] = useState(false);
+  const need = project.needs.find((n) => node.skills.includes(n.skill.name)) ?? null;
   const explain = isMe
     ? `You offer ${node.skills.join(" and ")}.`
     : node.kind === "swap"
@@ -49,15 +66,30 @@ export function PersonDetail({ node, isOwner, viewerId }: { node: PersonNode; is
       </div>
       {!isMe && (
         <div className="flex shrink-0 gap-2">
-          {isOwner && (
-            <Link href={`/u/${profile.handle}`} className={cn(btn.match, "max-lg:flex-1")}>
-              Invite to build
-            </Link>
-          )}
+          {isOwner &&
+            (invited ? (
+              <span className={cn(btn.done, "max-lg:flex-1")}>
+                <Check className="size-4" /> Invited
+              </span>
+            ) : (
+              <button onClick={() => setInviteOpen(true)} className={cn(btn.match, "max-lg:flex-1")}>
+                Invite to build
+              </button>
+            ))}
           <Link href={`/u/${profile.handle}`} className={cn(btn.secondary, "max-lg:flex-1")}>
             View profile
           </Link>
         </div>
+      )}
+      {isOwner && (
+        <InviteDialog
+          project={project}
+          person={profile}
+          need={need}
+          open={inviteOpen}
+          onOpenChange={setInviteOpen}
+          onInvited={() => setInvited(true)}
+        />
       )}
     </div>
   );

@@ -16,7 +16,7 @@ Instructions for Claude: build the frontend for Nodal described here. Read `DESI
 
 ## Layout
 
-The app is a social shell. One responsive `AppShell` wraps every signed-in route: a left rail at 1024px and wider, and a bottom tab bar below that. Both show the same five destinations: Home, Explore, Create, Inbox, Profile.
+The app is a social shell. One responsive `AppShell` wraps every signed-in route: a left rail at 1024px and wider, and a bottom tab bar below that. Both show the same five destinations: Home, Explore, Create, Inbox, Profile. The rail collapses to a 76px icon strip from its bottom button; the choice is stored in `localStorage` (`nodal-rail`) and the content padding follows it.
 
 ```
 frontend/
@@ -36,8 +36,8 @@ frontend/
   components/
     ui/                             # shadcn generated
     shell/
-      AppShell.tsx                  # picks SideRail or TabBar by breakpoint
-      SideRail.tsx                  # wordmark, five links, unread badge on Inbox
+      AppShell.tsx                  # picks SideRail or TabBar by breakpoint; remembers rail width
+      SideRail.tsx                  # wordmark, five links, unread badge on Inbox; collapses to icons
       TabBar.tsx                    # five icons, Create is a filled button
     feed/
       StoryRow.tsx                  # people ready to swap or ring (teal ring) and "Your idea"
@@ -121,16 +121,17 @@ NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 
 | Route | Shows | Key components |
 | --- | --- | --- |
-| `/` | Stories row, For you, Following, and Ideas tabs, PostCards; onboarding nudge until the profile is set up; desktop right column of swaps ready and needed-most tags | StoryRow, FeedTabs, PostCard, SideSuggestions, OnboardingPrompt |
+| `/` | Signed-out landing: value prop, sign-in card (name only), match preview, how it works, swaps and rings | SignInForm, MatchPreview, LandingPage |
+| `/feed` | Stories row, For you, Following, and Ideas tabs, PostCards; composer; onboarding nudge; right column of swaps and needed skills | Composer, StoryRow, FeedTabs, PostCard, SideSuggestions, OnboardingPrompt |
 | `/explore` | Search, filter chips (All, Needs you, Ideas, Software, Hardware, Creative, Open source), tile grid | ExploreGrid |
 | `/create` | New post: cover preview, title, caption, Looking for, You bring, checks switches (ideas only), submit | PostForm, SkillPicker, ChecksToggle |
 | `/projects/[id]` | Header with Star, Follow, Offer to help; tabs Code, Needs, Discussion, Activity; file table, README, About panel | ProjectHeader, ProjectTabs, FileTable, Readme, AboutPanel, LanguageBar, NeedList, CommentThread, SourceBrowser |
-| `/projects/[id]/results` | Ideas: Market and Cool factor checks beside the People graph. Projects: People who fit only | CheckTabs, ResearchReport, CoolFactorCard, PeopleGraph, PersonDetail |
+| `/projects/[id]/results` | Ideas: Market and Cool factor checks beside the People graph. Projects: People who fit only. Owners invite from here | CheckTabs, ResearchReport, CoolFactorCard, PeopleGraph, PersonDetail, InviteDialog |
 | `/projects/[id]/team` | Team and shares for Tolken bounties, still-open needs | TeamList, ShareBar |
-| `/inbox` | Requests and Messages; ring, swap, and join requests with Accept or Decline | RingInviteCard, RequestRow |
-| `/u/[handle]` | Profile: stats, I offer, interests, swaps and rings, contribution graph, Projects, Ideas, Starred, Tolken | ProfileHeader, SkillChips, CycleCard, ContributionGraph, ProfileGrid |
+| `/inbox` | Requests, Sent, and Messages; join/swap/ring requests with Accept or Decline; DM threads with invites and follow-ups | RingInviteCard, ConversationRow, MessageThread |
+| `/u/[handle]` | Profile: stats, I offer, interests, swaps and rings, contribution graph, Projects, Ideas, Starred, Tolken, **Message** | ProfileHeader, SkillChips, CycleCard, ContributionGraph, ProfileGrid |
 | `/onboarding` | Three steps: skills, interests, people to follow; saves the profile matching uses | OnboardingWizard |
-| `/login` | GitHub OAuth, email magic link, or browse first; auth lands on `/onboarding` | shadcn Card, Button |
+| `/login` | Name-only sign-in; auth lands on `/onboarding` | SignInForm |
 
 Protect `/create`, `/inbox`, `/u/me`, and `/projects/[id]/team` with a server-side session check that redirects to `/login`. Older routes (`/requests`, `/ideas`, `/for-you`, `/projects/new`, `/ideas/new`, `/me`) are replaced: Ideas and For you are tabs on `/`, requests live in `/inbox`, and creation is `/create`.
 
@@ -145,11 +146,17 @@ Protect `/create`, `/inbox`, `/u/me`, and `/projects/[id]/team` with a server-si
 
 Every screen below has a desktop and a mobile version built from the same components and data. On mobile the rail becomes the tab bar and two-column pages stack.
 
-### Home (`/`)
-- **StoryRow:** "Your idea" (dashed circle, links to `/create`), then people from `GET /feed/stories`. A teal ring marks swap or ring partners, labeled "maya · swap" or "dev · ring". Tapping one opens the matching Inbox thread or their profile.
-- **FeedTabs:** For you, Following, Ideas. Use `GET /feed?tab=` with cursor pagination and skeleton posts while loading.
-- **PostCard:** header (avatar, handle, time, what they did, Idea or Open source badge), `CoverArt` (400px desktop, 290px mobile) with the title over it, `CtaBar` ("Needs ESP32 firmware, sound design" with **Join this idea** for ideas or **Offer to help** for projects), action row (Star with count, Comments with count, People fit with count, Save), check badges when public (Market verdict, Cool factor score), caption, and "View all N comments".
-- **Desktop right column:** the user's mini profile, "Swaps ready for you" (three people with an **Invite** link), and "Needed most" skill chips.
+### Landing (`/`)
+- Signed-out first screen, no app chrome. Sticky header (logo, How it works, Swaps and rings, Sign in), then a two-column hero: the promise, three proof points, and a bordered **Sign in with your name** card on the left; a sample project + People who fit preview with an "Invite sent to Maya" strip on the right.
+- Below: **How it works** (three numbered steps, sunken band) and **Swaps and rings** (three explicit give/get links next to the explanation). Closing band links back to `#sign-in`. The preview is labeled sample data; nothing on the page fakes a signed-in state.
+- Sign-in is the only form: name, one primary button, and "Your session stays in this browser." Returning visitors get **Continue as {name}** instead.
+
+### Home (`/feed`)
+- **Composer:** avatar + "Share an idea or a project…" + **New post** (a sign-in prompt and **Sign in** for guests).
+- **StoryRow:** bordered **People to build with** row, 52px avatars, teal ring with a white offset for swap/ring, handle on the second line. Tapping one opens Inbox or their profile.
+- **FeedTabs:** For you, Following, Ideas. Use `GET /feed?tab=` with cursor pagination and skeleton posts while loading. Guests get one sign-in state instead of a failed request.
+- **PostCard:** owner header with avatar and relative time, 5:2 cover, title, meta, three-line caption, compact need chips with fit counts, then Star, Comments, and the Collab button.
+- **Desktop right column:** profile card with skills, swaps with **Give/Get** lines and an honest empty state, and most-needed skills with counts.
 
 ### Explore (`/explore`)
 - Search box and filter chips (toggle buttons with `aria-pressed`). Tiles are square `CoverArt` with a caption (title, type and source line). An Idea pill sits top right; there is no price pill. 4 columns on desktop, 2 on mobile.
@@ -180,8 +187,14 @@ Every screen below has a desktop and a mobile version built from the same compon
 - Shares split Tolken bounties. There is no seller, no price, no checkout, and no sales list.
 
 ### Inbox (`/inbox`)
-- Two-pane on desktop (thread list left, selected thread right); a single list on mobile with inline actions. Filter pills: Requests, Messages.
-- **RingInviteCard** lists who does what for whom ("You do UI design for Dev's game"), with **Accept ring** and **Decline**. Swap invites use the same card with two rows. A join request shows the person, the skill, and Accept or Decline. After all members accept a ring, link to `/projects/[id]/team`.
+- Two-pane on desktop (thread list left, selected thread right); a single list on mobile with inline actions. Filters: Requests, Sent, Messages (with an unread count).
+- **Requests and Sent:** ring, swap, and join requests. **RingInviteCard** lists who does what for whom ("You do UI design for Dev's game"), with **Accept ring** and **Decline**. Swap invites use the same card with two rows. A join request shows the person, the skill, and Accept or Decline. After all members accept a ring, link to `/projects/[id]/team`.
+- **Messages:** one row per person (avatar, last line, kind, project, unread). Opening a thread marks it read and shows the invite, any follow-up, and free-form replies as bubbles. While an invite is unanswered, the sender sees **Invite sent. No reply yet.** with **Ask if they've seen it**, which posts one nudge in the same thread.
+
+### Invite to a project (owner)
+- On `/projects/[id]/results`, the owner's **Invite to build** on a person opens `InviteDialog`. Optional note, then **Send invite**.
+- The confirmation is explicit: "Invite sent to Priya. It's already in your Messages with Priya, and they see it as a DM." From there the owner can **Ask if they've seen it** (one follow-up) or **Open messages**. There is no second notification system to check — the confirm and the DM are the same row.
+- Invitees see the invite in Messages and on their own unread count; they reply in the same thread. The endpoint rejects a second invite until they answer (409), so follow-up is the correct action instead of duplicate invites.
 
 ### Profile (`/u/[handle]`)
 - Header: 120px avatar (76px mobile), handle, **Edit profile** and **Share profile** on your own, stats (projects, stars, collaborations, followers), bio.

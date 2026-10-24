@@ -8,15 +8,16 @@ import { toast } from "sonner";
 import { Avatar } from "@/components/Avatar";
 import { EmptyState, ErrorState, RowsSkeleton } from "@/components/checks/States";
 import { api } from "@/lib/api";
-import type { CollabOut, Cycle, InboxItem, ProfileLite } from "@/lib/api-types";
+import type { CollabOut, ConversationOut, Cycle, InboxItem, ProfileLite } from "@/lib/api-types";
 import { useSession } from "@/lib/session";
 import { btn } from "@/lib/styles";
 import { invalidate, useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 import { ago, describe, displayName, joinNames } from "./format";
+import { ConversationRow, MessageThread } from "./Messages";
 import { RingInviteCard } from "./RingInviteCard";
 
-type Filter = "requests" | "sent";
+type Filter = "requests" | "sent" | "messages";
 
 const kindLabel = { collab: "Join request", swap: "Swap", ring: "Ring" } as const;
 
@@ -35,20 +36,38 @@ function Faces({ people, size }: { people: ProfileLite[]; size: number }) {
   );
 }
 
-function FilterToggle({ value, onChange }: { value: Filter; onChange: (f: Filter) => void }) {
+function FilterToggle({
+  value,
+  onChange,
+  unread,
+}: {
+  value: Filter;
+  onChange: (f: Filter) => void;
+  unread: number;
+}) {
   return (
-    <div className="flex rounded-lg border border-line p-0.5" role="group" aria-label="Show">
-      {(["requests", "sent"] as const).map((f) => (
+    <div className="flex w-full rounded-lg border border-line p-0.5 sm:w-auto" role="group" aria-label="Show">
+      {(["requests", "sent", "messages"] as const).map((f) => (
         <button
           key={f}
           aria-pressed={value === f}
           onClick={() => onChange(f)}
           className={cn(
-            "h-9 cursor-pointer rounded-md px-3.5 text-sm font-semibold capitalize transition-colors",
+            "flex h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md px-3 text-sm font-semibold capitalize transition-colors sm:flex-none sm:px-3.5",
             value === f ? "bg-ink text-white" : "text-muted-ink hover:bg-sunken hover:text-ink",
           )}
         >
           {f}
+          {f === "messages" && unread > 0 && (
+            <span
+              className={cn(
+                "flex min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold",
+                value === f ? "bg-white text-ink" : "bg-teal text-white",
+              )}
+            >
+              {unread}
+            </span>
+          )}
         </button>
       ))}
     </div>
@@ -241,9 +260,11 @@ export function InboxView() {
   const { ready, signedIn, me } = useSession();
   const inbox = useApi<InboxItem[]>(signedIn ? "/me/inbox" : null);
   const cycles = useApi<Cycle[]>(signedIn ? "/me/cycles" : null);
+  const conversations = useApi<ConversationOut[]>(signedIn ? "/me/conversations" : null);
   const [filter, setFilter] = useState<Filter>("requests");
   const [busy, setBusy] = useState(false);
   const selectedId = params.get("thread");
+  const messageProfileId = selectedId?.startsWith("m:") ? selectedId.slice(2) : null;
   const meProfile = me?.profile ?? null;
 
   const select = (id: string | null) => router.replace(id ? `${pathname}?thread=${id}` : pathname, { scroll: false });
@@ -251,8 +272,8 @@ export function InboxView() {
   if (ready && !signedIn) {
     return (
       <EmptyState
-        title="Sign in to see your requests"
-        body="Join requests, swap invites, and ring invites land here."
+        title="Sign in to see your inbox"
+        body="Join requests, swap invites, ring invites, and messages land here."
         action={
           <Link href="/" className={btn.primary}>
             Sign in
@@ -265,8 +286,11 @@ export function InboxView() {
 
   const items = inbox.data ?? [];
   const shown = items.filter((i) => (filter === "requests" ? i.direction === "incoming" : i.direction === "outgoing"));
+  const convos = conversations.data ?? [];
   const selected = items.find((i) => i.id === selectedId) ?? null;
   const pendingCount = items.filter((i) => i.actions.length > 0).length;
+  const unread = convos.reduce((sum, c) => sum + c.unread, 0);
+  const hasSelection = Boolean(selected || messageProfileId);
 
   function replace(next: InboxItem) {
     inbox.mutate((prev) => (prev ?? []).map((i) => (i.id === next.id ? next : i)));
@@ -290,7 +314,9 @@ export function InboxView() {
     }
   }
 
-  const detail = selected && (
+  const detail = messageProfileId ? (
+    <MessageThread profileId={messageProfileId} />
+  ) : selected ? (
     <div className="flex flex-col gap-4">
       <header className="flex items-center gap-3">
         <Faces people={selected.people} size={44} />
@@ -312,19 +338,54 @@ export function InboxView() {
         <RingInviteCard item={selected} me={meProfile} busy={busy} onRespond={(r) => respond(selected, r)} />
       )}
     </div>
-  );
+  ) : null;
 
   return (
     <div className="lg:grid lg:min-h-dvh lg:grid-cols-[380px_minmax(0,1fr)]">
-      <aside className={cn("border-line lg:border-r", selected && "max-lg:hidden")}>
-        <header className="flex items-center justify-between gap-3 px-5 pb-3 pt-5">
+      <aside className={cn("border-line lg:border-r", hasSelection && "max-lg:hidden")}>
+        <header className="flex flex-col gap-3 px-5 pb-3 pt-5 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-extrabold tracking-tight">
             Inbox
             {pendingCount > 0 && <span className="ml-2 text-base font-semibold text-teal">{pendingCount} to answer</span>}
           </h1>
-          <FilterToggle value={filter} onChange={setFilter} />
+          <FilterToggle
+            value={filter}
+            onChange={(f) => {
+              setFilter(f);
+              select(null);
+            }}
+            unread={unread}
+          />
         </header>
-        {inbox.error ? (
+
+        {filter === "messages" ? (
+          conversations.error ? (
+            <ErrorState error={conversations.error} onRetry={conversations.reload} />
+          ) : !conversations.data ? (
+            <RowsSkeleton rows={4} className="px-5 py-3" />
+          ) : convos.length === 0 ? (
+            <EmptyState
+              title="No messages yet"
+              body="Invite someone to your project from People who fit, or message a person from their profile."
+              action={
+                <Link href="/explore" className={btn.secondary}>
+                  Explore projects
+                </Link>
+              }
+            />
+          ) : (
+            <ul className="border-t border-line">
+              {convos.map((c) => (
+                <ConversationRow
+                  key={c.profile.id}
+                  item={c}
+                  active={c.profile.id === messageProfileId}
+                  onOpen={() => select(`m:${c.profile.id}`)}
+                />
+              ))}
+            </ul>
+          )
+        ) : inbox.error ? (
           <ErrorState error={inbox.error} onRetry={inbox.reload} />
         ) : !inbox.data ? (
           <RowsSkeleton rows={4} className="px-5 py-3" />
@@ -349,7 +410,7 @@ export function InboxView() {
             ))}
           </ul>
         )}
-        {cycles.data && meProfile && (
+        {filter !== "messages" && cycles.data && meProfile && (
           <CycleSuggestions
             cycles={cycles.data}
             items={items}
@@ -363,18 +424,26 @@ export function InboxView() {
         )}
       </aside>
 
-      <section className={cn("px-4 py-5 lg:px-8 lg:py-7", !selected && "max-lg:hidden")} aria-live="polite">
-        {selected ? (
+      <section className={cn("px-4 py-5 lg:px-8 lg:py-7", !hasSelection && "max-lg:hidden")} aria-live="polite">
+        {hasSelection ? (
           <>
             <button onClick={() => select(null)} className={cn(btn.ghost, "-ml-2 mb-3 px-2 lg:hidden")}>
-              <ChevronLeft className="size-5" /> Inbox
+              <ChevronLeft className="size-5" /> {messageProfileId ? "Messages" : "Inbox"}
             </button>
             {detail}
           </>
-        ) : selectedId && inbox.data ? (
-          <EmptyState title="That request is gone" body="It may have been withdrawn." />
+        ) : selectedId ? (
+          <EmptyState title="That one is gone" body="It may have been withdrawn or deleted." />
         ) : (
-          <EmptyState title="Pick a request" body="Choose one on the left to see who's asking and answer it." className="hidden lg:flex" />
+          <EmptyState
+            title={filter === "messages" ? "Pick a conversation" : "Pick a request"}
+            body={
+              filter === "messages"
+                ? "Choose a thread on the left to read it and reply."
+                : "Choose one on the left to see who's asking and answer it."
+            }
+            className="hidden lg:flex"
+          />
         )}
       </section>
     </div>

@@ -48,6 +48,7 @@ Nodal is a GitHub-style home for software, hardware, and creative projects, wher
 | Node graph view | Should | Project at center, fillers around it, rings highlighted |
 | Comments | Must | Flat, no threading |
 | Collab request | Should | One table, no real-time |
+| Direct messages and invites | Must | An owner's invite to a project is a DM; the confirmation and the invitee's message are the same row, and one follow-up ("have you seen it?") is allowed until they reply |
 | Tolken bounties | Should | Bounty on a need, priced in Tolken; the owner funds it from balance and releases it to the contributor. No money, no checkout |
 | Intersections feed | Should | Projects sharing tags across types |
 | Source upload: open | Should | Upload a zip. Source is open to read and download. File tree, viewer, download |

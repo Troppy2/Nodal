@@ -202,6 +202,34 @@ export interface TeamOut {
   total_bps: number;
 }
 
+export type MessageKind = "text" | "invite" | "nudge";
+
+export interface MessageOut {
+  id: string;
+  body: string;
+  kind: MessageKind;
+  mine: boolean;
+  created_at: string;
+  read_at: string | null;
+}
+
+export interface ConversationOut {
+  profile: ProfileLite;
+  project: ProjectRef | null;
+  last_body: string;
+  last_kind: MessageKind;
+  last_at: string;
+  mine: boolean;
+  unread: number;
+}
+
+export interface ThreadOut {
+  profile: ProfileLite;
+  project: ProjectRef | null;
+  messages: MessageOut[];
+  can_nudge: boolean;
+}
+
 export interface LedgerEntry {
   id: string;
   project_id: string;

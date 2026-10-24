@@ -8,8 +8,8 @@ from . import errors
 from .config import settings
 from .limits import limiter
 from .routers import (
-    auth, collab, comments, feed, graph, ideas, inbox, matches, me, profiles, projects, recommendations, research,
-    skills, social, source, team, tolken,
+    auth, collab, comments, feed, graph, ideas, inbox, matches, me, messages, profiles, projects, recommendations,
+    research, skills, social, source, team, tolken,
 )
 from .slugs import SlugMiddleware
 from .world import invalidate
@@ -58,6 +58,6 @@ def health():
 
 for module in (
     auth, projects, skills, comments, collab, social, profiles, me, source,
-    matches, graph, feed, recommendations, ideas, inbox, team, tolken, research,
+    matches, graph, feed, recommendations, ideas, inbox, messages, team, tolken, research,
 ):
     app.include_router(module.router, prefix="/api/v1")
