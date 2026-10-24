@@ -108,10 +108,7 @@ export default function LandingPage() {
       <main>
         <section className="mx-auto grid max-w-[1120px] gap-12 px-5 pb-16 pt-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,460px)] lg:items-center lg:gap-16 lg:pb-20 lg:pt-16">
           <div>
-            <p className="flex items-center gap-2 text-[13px] font-semibold text-muted-ink">
-              <span className="size-2 rounded-full bg-teal" aria-hidden />
-              Social Hack 2026 · Social Coding Club
-            </p>
+            <p className="text-[13px] font-semibold text-muted-ink">Social Hack 2026 · Social Coding Club</p>
             <h1 className="mt-4 max-w-[14ch] text-[42px] font-extrabold leading-[0.98] tracking-[-0.035em] text-ink sm:text-[56px] lg:text-[64px]">
               Find the people your project is missing.
             </h1>

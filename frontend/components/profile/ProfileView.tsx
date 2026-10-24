@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Link2, Loader2, MessageCircle, Pencil, X } from "lucide-react";
+import { ChevronRight, Link2, Loader2, MessageCircle, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar } from "@/components/Avatar";
 import { ProjectGrid } from "@/components/explore/ProjectTile";
@@ -17,7 +17,6 @@ import type { Cycle, MeOut, ProfileOut, ProjectCard } from "@/lib/api-types";
 import { useSession } from "@/lib/session";
 import { btn } from "@/lib/styles";
 import { invalidate, useApi } from "@/lib/use-api";
-import { cn } from "@/lib/utils";
 import { ContributionGraph } from "./ContributionGraph";
 import { OfferEditor } from "./OfferEditor";
 import { TolkenPanel } from "./TolkenPanel";
@@ -423,14 +422,20 @@ function Cycles() {
         <ul className="divide-y divide-line border-y border-line">
           {cycles.data.map((c) => {
             const others = c.members.filter((m) => m.id !== me?.profile.id).map((m) => m.handle);
+            const who = c.kind === "swap" ? `You and ${others[0]}` : `You, ${others.join(" and ")}`;
             return (
               <li key={c.id}>
-                <Link href="/inbox" className="flex items-center gap-3 rounded-md px-1 py-2.5 transition-colors hover:bg-sunken">
-                  <span className={cn("w-10 text-xs font-semibold", "text-teal")}>{c.kind === "swap" ? "Swap" : "Ring"}</span>
-                  <span className="min-w-0 flex-1 truncate text-sm">
-                    {c.kind === "swap" ? `You and ${others[0]}` : `You, ${others.join(" and ")}`}
+                <Link
+                  href="/inbox"
+                  aria-label={`Open the ${c.kind} with ${others.join(" and ")} in your inbox`}
+                  className="group -mx-3 flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-sunken focus-visible:outline-offset-[-3px]"
+                >
+                  <span className="w-10 shrink-0 text-xs font-semibold text-teal">{c.kind === "swap" ? "Swap" : "Ring"}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm">{who}</span>
+                  <span className="flex shrink-0 items-center gap-1 text-[13px] font-semibold text-muted-ink transition-colors group-hover:text-ink">
+                    Open
+                    <ChevronRight className="size-3.5" strokeWidth={2.25} />
                   </span>
-                  <span className="text-[13px] font-semibold">Open</span>
                 </Link>
               </li>
             );

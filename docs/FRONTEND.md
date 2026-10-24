@@ -16,7 +16,7 @@ Instructions for Claude: build the frontend for Nodal described here. Read `DESI
 
 ## Layout
 
-The app is a social shell. One responsive `AppShell` wraps every signed-in route: a left rail at 1024px and wider, and a bottom tab bar below that. Both show the same five destinations: Home, Explore, Create, Inbox, Profile.
+The app is a social shell. One responsive `AppShell` wraps every signed-in route: a left rail at 1024px and wider, and a bottom tab bar below that. Both show the same five destinations: Home, Explore, Create, Inbox, Profile. The rail collapses to a 76px icon strip from its bottom button; the choice is stored in `localStorage` (`nodal-rail`) and the content padding follows it.
 
 ```
 frontend/
@@ -36,8 +36,8 @@ frontend/
   components/
     ui/                             # shadcn generated
     shell/
-      AppShell.tsx                  # picks SideRail or TabBar by breakpoint
-      SideRail.tsx                  # wordmark, five links, unread badge on Inbox
+      AppShell.tsx                  # picks SideRail or TabBar by breakpoint; remembers rail width
+      SideRail.tsx                  # wordmark, five links, unread badge on Inbox; collapses to icons
       TabBar.tsx                    # five icons, Create is a filled button
     feed/
       StoryRow.tsx                  # people ready to swap or ring (teal ring) and "Your idea"
