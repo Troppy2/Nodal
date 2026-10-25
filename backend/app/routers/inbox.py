@@ -140,13 +140,46 @@ def custom_swap(body: CustomSwapIn, user: dict = Depends(get_current_user)):
     t = service_client().table
     w = world()
 
-    my_proj = t("projects").select("id,owner_id,title").eq("id", body.my_project_id).execute().data
-    their_proj = t("projects").select("id,owner_id,title").eq("id", body.their_project_id).execute().data
-    if not my_proj or my_proj[0]["owner_id"] != me:
+    def _resolve(ref: str) -> dict | None:
+        ref = ref.strip()
+        # 1. World check by id or slug
+        pid = w.project_id(ref)
+        if pid and pid in w.projects:
+            proj = w.projects[pid]
+            return {"id": proj["id"], "owner_id": proj["owner_id"], "title": proj["title"], "slug": proj.get("slug")}
+        # 2. Database check by id or slug
+        try:
+            res = t("projects").select("id,owner_id,title,slug").eq("id", ref).execute().data
+            if res:
+                return res[0]
+        except Exception:
+            pass
+        res = t("projects").select("id,owner_id,title,slug").eq("slug", ref).execute().data
+        if res:
+            return res[0]
+        return None
+
+    my_proj = _resolve(body.my_project_id)
+    their_proj = _resolve(body.their_project_id)
+    if not my_proj or my_proj["owner_id"] != me:
         raise HTTPException(403, "You do not own your specified project")
-    if not their_proj or their_proj[0]["owner_id"] != body.partner_id:
+    if not their_proj or their_proj["owner_id"] != body.partner_id:
         raise HTTPException(422, "Partner does not own the target project")
 
+    my_pid = my_proj["id"]
+    their_pid = their_proj["id"]
+
+    # If default skill id was sent, try to pick from open project needs
+    my_needs = w.needs_by_project.get(my_pid, [])
+    their_needs = w.needs_by_project.get(their_pid, [])
+
+    their_skill = body.their_skill_id
+    if (not their_skill or their_skill == 1) and my_needs:
+        their_skill = my_needs[0]["skill_id"]
+
+    my_skill = body.my_skill_id
+    if (not my_skill or my_skill == 1) and their_needs:
+        my_skill = their_needs[0]["skill_id"]
     my_skill = w.skills.get(body.my_skill_id)
     their_skill = w.skills.get(body.their_skill_id)
     if not my_skill or not their_skill:
@@ -156,6 +189,10 @@ def custom_swap(body: CustomSwapIn, user: dict = Depends(get_current_user)):
         {
             "from": me,
             "to": body.partner_id,
+            "project_id": their_pid,
+            "skill_id": my_skill,
+            "project_title": their_proj["title"],
+            "skill_name": w.skills.get(my_skill, {}).get("name", "Skill"),
             "project_id": body.their_project_id,
             "project_title": their_proj[0]["title"],
             "skill": skill_out(my_skill),
@@ -163,6 +200,10 @@ def custom_swap(body: CustomSwapIn, user: dict = Depends(get_current_user)):
         {
             "from": body.partner_id,
             "to": me,
+            "project_id": my_pid,
+            "skill_id": their_skill,
+            "project_title": my_proj["title"],
+            "skill_name": w.skills.get(their_skill, {}).get("name", "Skill"),
             "project_id": body.my_project_id,
             "project_title": my_proj[0]["title"],
             "skill": skill_out(their_skill),

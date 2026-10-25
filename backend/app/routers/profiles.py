@@ -5,9 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..db import parallel, service_client
 from ..deps import get_optional_user
-from ..models import ActivityDay, ProfileOut
+from ..models import ActivityDay, ProfileLite, ProfileOut
 from ..services.cards import cards, profile_lite, skill_out
-from ..world import World, world
+from ..world import PROFILE_COLS, World, world
 
 router = APIRouter()
 
@@ -27,6 +27,63 @@ def _profile_id(w: World, handle: str) -> str:
 
 def _joined_contributors(w: World, project_id: str) -> list[dict]:
     return [m for m in w.members.get(project_id, []) if m["role"] == "contributor" and m["status"] == "joined"]
+
+
+@router.get("/profiles", response_model=list[ProfileLite])
+def search_profiles(
+    q: str = Query("", min_length=0),
+    limit: int = Query(10, ge=1, le=50),
+    viewer: dict | None = Depends(get_optional_user),
+):
+    """Search profiles by handle or display name for mentions or autocomplete. Excludes viewer."""
+    w = world()
+    viewer_id = viewer and viewer["id"]
+    needle = q.strip().lower().lstrip("@")
+
+    candidates: list[tuple[int, str, dict]] = []
+    for p in w.profiles.values():
+        if viewer_id and p["id"] == viewer_id:
+            continue
+        handle = (p.get("handle") or "").lower()
+        name = (p.get("display_name") or "").lower()
+        if not needle:
+            candidates.append((0, handle, p))
+        elif handle == needle:
+            candidates.append((1, handle, p))
+        elif handle.startswith(needle):
+            candidates.append((2, handle, p))
+        elif needle in handle:
+            candidates.append((3, handle, p))
+        elif name.startswith(needle) or needle in name:
+            candidates.append((4, handle, p))
+
+    candidates.sort(key=lambda x: (x[0], x[1]))
+    results = [profile_lite(item[2]) for item in candidates[:limit]]
+
+    if len(results) < limit and needle:
+        seen = {r["id"] for r in results}
+        if viewer_id:
+            seen.add(viewer_id)
+        try:
+            db_profiles = (
+                service_client()
+                .table("profiles")
+                .select(PROFILE_COLS)
+                .or_(f"handle.ilike.%{needle}%,display_name.ilike.%{needle}%")
+                .limit(limit)
+                .execute()
+                .data
+            )
+            for p in db_profiles:
+                if p["id"] not in seen:
+                    results.append(profile_lite(p))
+                    seen.add(p["id"])
+                    if len(results) >= limit:
+                        break
+        except Exception:
+            pass
+
+    return results
 
 
 @router.get("/profiles/{handle}", response_model=ProfileOut)

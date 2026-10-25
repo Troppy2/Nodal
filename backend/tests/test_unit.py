@@ -134,3 +134,28 @@ def test_keycheck_names_the_bad_key(monkeypatch):
     assert "legacy JWT key" in keycheck.problems()[0]
     monkeypatch.setattr(settings, "supabase_service_key", jwt_for("service_role", ref="other"))
     assert "belongs to project 'other'" in keycheck.problems()[0]
+
+
+def test_search_profiles_autofill(monkeypatch):
+    from app.routers import profiles
+
+    fake_profiles = {
+        "p1": {"id": "p1", "handle": "alex", "display_name": "Alex Chen", "avatar_url": None},
+        "p2": {"id": "p2", "handle": "sarah", "display_name": "Sarah Connor", "avatar_url": None},
+        "p3": {"id": "p3", "handle": "alexandra", "display_name": "Alexandra B", "avatar_url": None},
+    }
+    fake_world = SimpleNamespace(profiles=fake_profiles)
+    monkeypatch.setattr(profiles, "world", lambda: fake_world)
+
+    # 1. Search with "ale" matches "alex" and "alexandra"
+    results = profiles.search_profiles(q="ale", limit=10, viewer=None)
+    handles = [r["handle"] for r in results]
+    assert "alex" in handles
+    assert "alexandra" in handles
+    assert "sarah" not in handles
+
+    # 2. Search excludes viewer
+    results_viewer = profiles.search_profiles(q="ale", limit=10, viewer={"id": "p1"})
+    handles_viewer = [r["handle"] for r in results_viewer]
+    assert "alex" not in handles_viewer
+    assert "alexandra" in handles_viewer
