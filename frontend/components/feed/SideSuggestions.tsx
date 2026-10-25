@@ -11,7 +11,6 @@ import type { Cycle, ProjectList } from "@/lib/api-types";
 import { useSession } from "@/lib/session";
 import { btn } from "@/lib/styles";
 import { invalidate, useApi } from "@/lib/use-api";
-import { cn } from "@/lib/utils";
 
 function CycleRow({ cycle, meId }: { cycle: Cycle; meId: string }) {
   const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
@@ -38,61 +37,47 @@ function CycleRow({ cycle, meId }: { cycle: Cycle; meId: string }) {
   const partnerNames = others.map((o) => (o.display_name || o.handle).split(" ")[0]).join(" & ");
 
   return (
-    <li className="flex items-start gap-2.5 py-2.5 border-b border-line/60 last:border-b-0">
-      <Link href={`/u/${partner.handle}`} className="shrink-0 rounded-full mt-0.5">
-        <Avatar person={partner} size={34} ring={cycle.kind === "ring"} />
+    <li className="flex items-center gap-2.5">
+      <Link href={`/u/${partner.handle}`} className="shrink-0 rounded-full">
+        <Avatar person={partner} size={32} ring={cycle.kind === "ring"} />
       </Link>
       <div className="min-w-0 flex-1 leading-snug">
-        {/* Name and Collaboration Type Badge aligned together */}
-        <div className="flex items-center gap-1.5 min-w-0">
+        <div className="flex items-baseline gap-1.5 min-w-0">
           <Link
             href={`/u/${partner.handle}`}
-            className="truncate text-[13px] font-bold text-ink hover:underline"
+            className="truncate text-[13px] font-semibold text-ink hover:underline"
           >
             {partnerNames}
           </Link>
-          <span
-            className={cn(
-              "inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0 border",
-              cycle.kind === "swap"
-                ? "bg-teal-tint text-teal border-teal/20"
-                : "bg-purple-500/10 text-purple-600 border-purple-500/20",
-            )}
-          >
-            {cycle.kind === "swap" ? "Swap" : "3-Way Ring"}
+          <span className="shrink-0 text-[11px] text-muted-ink">
+            · {cycle.kind === "swap" ? "Swap" : "Ring"}
           </span>
         </div>
-
-        {/* Structured skill trade exchange */}
         {iGive && iGet && (
-          <div className="mt-1 flex flex-col gap-0.5 text-[11px] leading-tight text-muted-ink">
+          <p className="mt-0.5 flex flex-col gap-0.5 text-xs leading-snug text-muted-ink">
             <span className="truncate">
-              Give <span className="font-medium text-ink">{iGive}</span>
+              Give <span className="text-ink">{iGive}</span>
             </span>
             <span className="truncate">
-              Get <span className="font-medium text-ink">{iGet}</span>
+              Get <span className="text-ink">{iGet}</span>
             </span>
-          </div>
+          </p>
         )}
       </div>
-
-      {/* Action button */}
-      <div className="shrink-0 self-center">
-        {state === "sent" ? (
-          <span className="flex items-center gap-1 text-xs font-bold text-teal">
-            <Check className="size-3.5" /> Sent
-          </span>
-        ) : (
-          <button
-            className={cn(btn.match, "h-7 px-2.5 text-xs font-bold shadow-2xs")}
-            onClick={invite}
-            disabled={state === "sending"}
-          >
-            {state === "sending" && <Loader2 className="size-3 animate-spin mr-1" />}
-            Invite
-          </button>
-        )}
-      </div>
+      {state === "sent" ? (
+        <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-teal">
+          <Check className="size-3.5" /> Sent
+        </span>
+      ) : (
+        <button
+          className="flex h-8 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-semibold text-teal transition-colors hover:bg-teal-tint disabled:opacity-60"
+          onClick={invite}
+          disabled={state === "sending"}
+        >
+          {state === "sending" && <Loader2 className="size-3.5 animate-spin" />}
+          Invite
+        </button>
+      )}
     </li>
   );
 }
@@ -188,7 +173,7 @@ export function SideSuggestions() {
               </Link>
             </div>
           ) : (
-            <ul className="flex flex-col">
+            <ul className="flex flex-col gap-3">
               {cycleList.slice(0, 3).map((c) => (
                 <CycleRow key={c.id} cycle={c} meId={me?.profile.id ?? ""} />
               ))}

@@ -6,6 +6,7 @@ import { Label } from "@/components/Meta";
 import type { Story } from "@/lib/api-types";
 import { useSession } from "@/lib/session";
 import { useApi } from "@/lib/use-api";
+import { cn } from "@/lib/utils";
 
 function firstName(person: { display_name: string | null; handle: string }) {
   return (person.display_name || person.handle).split(" ")[0];
@@ -52,15 +53,9 @@ export function StoryRow() {
             <Avatar person={profile} size={52} ring={tag !== null} />
             <span className="flex max-w-full flex-col items-center leading-tight">
               <span className="max-w-full truncate text-xs font-medium">{firstName(profile)}</span>
-              {tag ? (
-                <span className="mt-0.5 inline-flex items-center rounded-md bg-teal-tint px-1.5 py-0.2 text-[10px] font-bold uppercase tracking-wider text-teal border border-teal/20">
-                  {tag === "ring" ? "Ring" : "Swap"}
-                </span>
-              ) : (
-                <span className="max-w-full truncate text-[11px] text-muted-ink">
-                  @{profile.handle}
-                </span>
-              )}
+              <span className={cn("max-w-full truncate text-[11px]", tag ? "font-semibold text-teal" : "text-muted-ink")}>
+                {tag === "ring" ? "Ring" : tag === "swap" ? "Swap" : `@${profile.handle}`}
+              </span>
             </span>
           </Link>
         ))}
