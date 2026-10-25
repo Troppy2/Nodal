@@ -441,13 +441,6 @@ export function RequestsView() {
                 <h1 className="text-2xl font-black tracking-tight text-ink">Requests</h1>
                 <p className="text-xs text-muted-ink mt-0.5">Manage incoming collaborations & sent proposals</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setProposingSwap(true)}
-                className="inline-flex items-center gap-1 rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs font-bold text-teal hover:border-teal transition-colors shadow-2xs"
-              >
-                + Custom Swap
-              </button>
             </div>
 
             {/* Received vs Sent Main Tabs */}
