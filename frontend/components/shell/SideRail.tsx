@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogIn, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Avatar } from "@/components/Avatar";
+import { TOLKEN } from "@/lib/cover";
 import { useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { AlertsBadge, MessagesBadge, RequestsBadge } from "./InboxBadge";
@@ -125,6 +126,38 @@ export function SideRail({ collapsed, onToggle }: { collapsed: boolean; onToggle
         })}
       </div>
 
+      {/* Tolken Wallet Badge in Sidebar */}
+      {signedIn && me && (
+        <Link
+          href="/u/me?tab=tolken"
+          aria-label={`Tolken wallet: ${me.tolken_balance.toLocaleString()} available`}
+          className={cn(
+            "group relative mt-auto mb-2 flex items-center rounded-xl border border-line bg-sunken/40 transition-all hover:bg-sunken hover:border-teal/40",
+            collapsed ? "size-11 justify-center p-0" : "w-full gap-2.5 px-3 py-2",
+          )}
+        >
+          <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-teal text-white text-xs font-black shadow-2xs">
+            {TOLKEN}
+          </span>
+          {!collapsed && (
+            <div className="min-w-0 flex-1 leading-none">
+              <p className="text-[10px] font-bold text-muted-ink uppercase tracking-wider">Tolken</p>
+              <p className="mt-0.5 truncate text-xs font-black text-ink group-hover:text-teal transition-colors">
+                {me.tolken_balance.toLocaleString()}
+              </p>
+            </div>
+          )}
+          {collapsed && (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute left-[calc(100%+8px)] z-50 whitespace-nowrap rounded-md bg-ink px-2 py-1 text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100"
+            >
+              {TOLKEN} {me.tolken_balance.toLocaleString()} Tolken
+            </span>
+          )}
+        </Link>
+      )}
+
       <button
         type="button"
         onClick={onToggle}
@@ -133,7 +166,8 @@ export function SideRail({ collapsed, onToggle }: { collapsed: boolean; onToggle
         title={collapsed ? toggleLabel : undefined}
         className={cn(
           linkClass,
-          "mt-auto w-full cursor-pointer font-medium text-muted-ink hover:bg-sunken hover:text-ink",
+          !signedIn && "mt-auto",
+          "w-full cursor-pointer font-medium text-muted-ink hover:bg-sunken hover:text-ink",
           collapsed && "w-11 justify-center gap-0 px-0",
         )}
       >

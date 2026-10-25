@@ -5,6 +5,7 @@ import { Star } from "lucide-react";
 import { CoverArt } from "@/components/feed/CoverArt";
 import { ProjectMeta } from "@/components/Meta";
 import type { ProjectCard } from "@/lib/api-types";
+import { formatTolken, TOLKEN } from "@/lib/cover";
 import { useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
@@ -14,14 +15,24 @@ export function ProjectTile({ project, showOwner = true }: { project: ProjectCar
   const own = me?.profile.id === project.owner.id;
   const href = project.stage === "idea" && own ? `/projects/${project.id}/results` : `/projects/${project.id}`;
   const open = project.needs.filter((n) => n.status === "open");
+  const totalBounty = open.reduce((sum, n) => sum + (n.bounty_tolken || 0), 0);
+
   return (
     <Link href={href} className="group flex flex-col rounded-lg">
-      <CoverArt
-        cover={project.cover}
-        coverUrl={project.cover_url}
-        seed={project.id}
-        className="aspect-[4/3] rounded-lg transition-[filter] duration-150 group-hover:brightness-[0.96]"
-      />
+      <div className="relative overflow-hidden rounded-lg">
+        <CoverArt
+          cover={project.cover}
+          coverUrl={project.cover_url}
+          seed={project.id}
+          className="aspect-[4/3] rounded-lg transition-[filter] duration-150 group-hover:brightness-[0.96]"
+        />
+        {totalBounty > 0 && (
+          <span className="absolute top-2 right-2 rounded-md bg-teal/95 backdrop-blur-xs px-2 py-0.5 text-[11px] font-black text-white shadow-xs flex items-center gap-1">
+            <span>{TOLKEN}</span> {totalBounty} bounty
+          </span>
+        )}
+      </div>
+
       <h3 className="mt-2.5 text-[15px] font-bold leading-tight group-hover:underline">{project.title}</h3>
       <ProjectMeta project={project} className="mt-1 gap-x-2" />
       {open.length > 0 ? (
@@ -30,7 +41,12 @@ export function ProjectTile({ project, showOwner = true }: { project: ProjectCar
           {open.map((n, i) => (
             <span key={n.id}>
               {i > 0 && ", "}
-              <span className={cn(n.viewer_fits ? "font-semibold text-teal" : "text-ink")}>{n.skill.name}</span>
+              <span className={cn(n.viewer_fits ? "font-semibold text-teal" : "text-ink")}>
+                {n.skill.name}
+                {n.bounty_tolken ? (
+                  <span className="font-semibold text-teal"> ({formatTolken(n.bounty_tolken)})</span>
+                ) : null}
+              </span>
             </span>
           ))}
         </p>
