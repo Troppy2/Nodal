@@ -89,7 +89,7 @@ Nodal looks and behaves like a social app for builders: Instagram's structure wi
 
 **Instagram structure**
 
-- Home feed with For you, Following, Needs you, and Intersections tabs.
+- Home feed with For you, Following, and Needs you tabs.
 - A stories row of people who are ready to swap or complete a ring with you.
 - Project posts: cover art, a call-to-action bar ("Needs ESP32 firmware" with a Join button), star, comment, and "people who fit" counts.
 - Explore: a search box, filter chips, and a grid of cover tiles.

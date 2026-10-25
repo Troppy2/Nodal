@@ -163,3 +163,4 @@ There are 49 backend tests. They create real Supabase users and clean up after t
 - 2026-10-25: Home feed tabs cut to For you, Following, Needs you, Intersections. Ideas and Projects were removed because the Projects page and Explore already cover them. The backend still accepts `tab=ideas|projects`.
 - 2026-10-25: Added the presentation deck as `docs/Nodal-Social-Hack-2026-slides.pdf`.
 - 2026-10-25: Slides PDF gained a hook slide (page 2: "The job market is f*****."). TALK.md opens with the hook line.
+- 2026-10-25: Removed the Intersections feed tab; `Intersections.tsx` is now `NeedsYou.tsx`. `GET /feed/intersections` still exists. DEMO step 1 now uses the For you "People to build with" row.

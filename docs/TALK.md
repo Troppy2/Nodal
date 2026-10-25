@@ -44,7 +44,7 @@ Watch for: say "need", not "have". Say "Tolken", not "tokens". Don't say "invest
 ## 3. Live demo: Intersect → Connect → Collaborate (~3 min)
 
 - **Intersect** (DEMO steps 1–3):
-  - The Intersections tab. "A creative map and a parking app both care about campus. Nodal found that overlap."
+  - Home, "People to build with": "Before I post anything, Nodal shows who my skills intersect with."
   - Post Singing Plant and let the research agent check it.
 - **Connect** (DEMO steps 4–6):
   - The graph shows Rin with a Swap badge. "She fills our need, and we can fill hers."

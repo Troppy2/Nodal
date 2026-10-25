@@ -17,7 +17,7 @@ The talk is [TALK.md](TALK.md). The click-by-click script is [DEMO.md](DEMO.md).
 
 | Feature | Where | Criterion | Say this |
 |---|---|---|---|
-| **Intersections feed** | Home → Intersections | Innovation, prompt fit | "Projects from different worlds working on the same thing. A creative map and a parking app both care about campus. Nodal finds that overlap." |
+| **People to build with** | Home → For you, top row | Innovation, prompt fit | "Before I post anything, Nodal shows who my skills intersect with: swaps and rings, labelled." |
 | **Post an idea with needs** | Create | Usability | "Say what you're making and which skills you need. That's all matching needs." |
 | **Research agent** | Results → Market check, Cool factor | Technical complexity | "An agent plans searches, reads pages, extracts facts and writes a report where every claim cites a source." |
 

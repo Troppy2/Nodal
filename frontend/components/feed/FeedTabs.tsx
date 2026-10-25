@@ -11,11 +11,11 @@ import type { FeedResponse, ProjectCard } from "@/lib/api-types";
 import { useSession } from "@/lib/session";
 import { btn } from "@/lib/styles";
 import { useApi } from "@/lib/use-api";
-import { IntersectionList, NeedsYouList } from "./Intersections";
+import { NeedsYouList } from "./NeedsYou";
 import { PostCard, PostCardSkeleton } from "./PostCard";
 
 type Tab = "for_you" | "following";
-type AnyTab = Tab | "needs_you" | "intersections";
+type AnyTab = Tab | "needs_you";
 
 const empty: Record<Tab, { text: string; action: React.ReactNode }> = {
   for_you: {
@@ -106,7 +106,6 @@ export function FeedTabs() {
           { id: "for_you", label: "For you" },
           { id: "following", label: "Following" },
           { id: "needs_you", label: "Needs you" },
-          { id: "intersections", label: "Intersections" },
         ]}
         className="gap-5 px-4 lg:gap-7 lg:px-0"
       />
@@ -114,8 +113,6 @@ export function FeedTabs() {
         <div className="px-4 pt-3 lg:px-0 lg:pt-4">
           <PostCardSkeleton />
         </div>
-      ) : tab === "intersections" ? (
-        <IntersectionList />
       ) : guest ? (
         <div className="px-4 pt-3 lg:px-0 lg:pt-4">
           <EmptyState

@@ -29,10 +29,10 @@ Each step has one place it starts and one thing on screen that shows it worked.
 
 ## Beat 1: Intersect
 
-### 1. The problem: intersections (Window A, Maya)
-- **Start:** Home → **Intersections** tab.
-- **Do:** Point at Campus Radio Map (creative) × Park&Go (software), both on `#campus #maps`.
-- **End:** "These two teams work on the same thing and have never met. Nodal finds that overlap."
+### 1. Where people meet (Window A, Maya)
+- **Start:** Home, **For you** tab.
+- **Do:** Point at the "People to build with" row: Rin is tagged **Swap**, Vishnu and Dev **Ring**.
+- **End:** "Before I've posted anything, Nodal already shows who my skills intersect with."
 
 ### 2. Post an idea
 - **Start:** **Create**.

@@ -122,7 +122,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 | Route | Shows | Key components |
 | --- | --- | --- |
 | `/` | Signed-out landing: value prop, sign-in card (name only), match preview, how it works, swaps and rings | SignInForm, MatchPreview, LandingPage |
-| `/feed` | Stories row, For you, Following, Needs you, and Intersections tabs, PostCards; composer; onboarding nudge; right column of swaps and needed skills | Composer, StoryRow, FeedTabs, PostCard, SideSuggestions, OnboardingPrompt |
+| `/feed` | Stories row, For you, Following, and Needs you tabs, PostCards; composer; onboarding nudge; right column of swaps and needed skills | Composer, StoryRow, FeedTabs, PostCard, SideSuggestions, OnboardingPrompt |
 | `/explore` | Search, filter chips (All, Needs you, Ideas, Software, Hardware, Creative, Open source), tile grid | ExploreGrid |
 | `/create` | New post: cover preview, title, caption, Looking for, You bring, checks switches (ideas only), submit | PostForm, SkillPicker, ChecksToggle |
 | `/projects/[id]` | Header with Star, Follow, Offer to help; tabs Code, Needs, Discussion, Activity; file table, README, About panel | ProjectHeader, ProjectTabs, FileTable, Readme, AboutPanel, LanguageBar, NeedList, CommentThread, SourceBrowser |
@@ -296,7 +296,7 @@ There is no money in Nodal: no checkout, no prices, no payouts. Tolken (`◈`) i
 - ProjectForm (zod validation): type, title, summary, cover upload, repo/demo links, source (SourceUpload: none or open), tags, needs (SkillPicker plus note per need, optional Tolken bounty). In idea mode (`mode="idea"`) the form hides source and repo/demo links, adds a README field, shows the check switches, and sends `stage: "idea"`.
 
 ### Home
-- Intersections feed from `GET /feed/intersections`: card pairs showing two projects of different types and the shared tags.
+- Intersections feed (`GET /feed/intersections`): backend only; the feed tab was removed on 2026-10-25.
 
 ## UX rules
 
@@ -311,7 +311,7 @@ There is no money in Nodal: no checkout, no prices, no payouts. Tolken (`◈`) i
 ## Definition of done
 
 1. Log in with GitHub or magic link, then finish onboarding: pick skills, interests, and people to follow.
-2. The Home feed shows the stories row and PostCards; the For you, Following, Needs you, and Intersections tabs change the list.
+2. The Home feed shows the stories row and PostCards; the For you, Following, and Needs you tabs change the list.
 3. Create an idea with a need and the two check switches; the submit text follows the switches; submitting opens the results page. Posting as a project shows no checks and opens the project page.
 4. Results page: the chosen checks show in tabs (steps stream while running; sample badge in fixture mode), and the People graph shows the seeded swap and ring in teal; selecting a person updates PersonDetail. A project's results page shows people only.
 5. Send a collab request or ring invite; the other user sees and responds in `/inbox`.
