@@ -122,7 +122,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 | Route | Shows | Key components |
 | --- | --- | --- |
 | `/` | Signed-out landing: value prop, sign-in card (name only), match preview, how it works, swaps and rings | SignInForm, MatchPreview, LandingPage |
-| `/feed` | Stories row, For you, Following, and Ideas tabs, PostCards; composer; onboarding nudge; right column of swaps and needed skills | Composer, StoryRow, FeedTabs, PostCard, SideSuggestions, OnboardingPrompt |
+| `/feed` | Stories row, For you, Following, Needs you, and Intersections tabs, PostCards; composer; onboarding nudge; right column of swaps and needed skills | Composer, StoryRow, FeedTabs, PostCard, SideSuggestions, OnboardingPrompt |
 | `/explore` | Search, filter chips (All, Needs you, Ideas, Software, Hardware, Creative, Open source), tile grid | ExploreGrid |
 | `/create` | New post: cover preview, title, caption, Looking for, You bring, checks switches (ideas only), submit | PostForm, SkillPicker, ChecksToggle |
 | `/projects/[id]` | Header with Star, Follow, Offer to help; tabs Code, Needs, Discussion, Activity; file table, README, About panel | ProjectHeader, ProjectTabs, FileTable, Readme, AboutPanel, LanguageBar, NeedList, CommentThread, SourceBrowser |
@@ -241,7 +241,7 @@ For each item from `GET /me/cycles`: a badge (Swap or Ring), the members as avat
 An idea is a project at stage `idea`; reuse the project pages.
 
 - `/create` in idea mode: PostForm with title, one-line pitch (summary), README (markdown textarea with a live preview tab using Readme), tags, and needs (SkillPicker, optional bounty). Posts `POST /projects` with `stage: "idea"`. Source upload is hidden in idea mode.
-- The Ideas tab on `/` and the Ideas chip on `/explore` filter with `stage=idea`.
+- The Ideas chip on `/explore` filters with `stage=idea`.
 - Project page: StageBadge in the header and a Readme section that renders `readme_md`. Visitors see **Join this idea**, which opens the existing collab request dialog (pick a need that fits, add a message). Comments work as they are.
 - Owner of an idea sees **Graduate to building** (`PATCH` with `stage: "building"`), which then reveals SourceUpload.
 - Readme: render with `react-markdown` and `remark-gfm`, raw HTML disabled; external links open with `target="_blank"` and `rel="noopener noreferrer"`.
@@ -311,7 +311,7 @@ There is no money in Nodal: no checkout, no prices, no payouts. Tolken (`◈`) i
 ## Definition of done
 
 1. Log in with GitHub or magic link, then finish onboarding: pick skills, interests, and people to follow.
-2. The Home feed shows the stories row and PostCards; the For you, Following, and Ideas tabs change the list.
+2. The Home feed shows the stories row and PostCards; the For you, Following, Needs you, and Intersections tabs change the list.
 3. Create an idea with a need and the two check switches; the submit text follows the switches; submitting opens the results page. Posting as a project shows no checks and opens the project page.
 4. Results page: the chosen checks show in tabs (steps stream while running; sample badge in fixture mode), and the People graph shows the seeded swap and ring in teal; selecting a person updates PersonDetail. A project's results page shows people only.
 5. Send a collab request or ring invite; the other user sees and responds in `/inbox`.
