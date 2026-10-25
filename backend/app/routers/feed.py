@@ -58,7 +58,10 @@ def stories(user: dict = Depends(get_current_user)):
     me = user["id"]
     out: list[dict] = []
     seen: set[str] = set()
-    for c in w.matching.cycles_for(me, limit=20):
+    # A direct swap is the stronger connection, so it wins when someone is in both a swap and a ring.
+    # The sort is stable, keeping cycles_for's score order inside each group.
+    cycles = sorted(w.matching.cycles_for(me, limit=20), key=lambda c: c["kind"] != "swap")
+    for c in cycles:
         for e in c["links"]:
             if e.frm == me or e.frm in seen:
                 continue
