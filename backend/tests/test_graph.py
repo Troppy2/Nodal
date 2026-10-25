@@ -70,7 +70,10 @@ def test_swap_shows_in_cycles_stories_and_invite_flow(client, swap_user, seeded)
     assert {link["from"] for link in swap["links"]} == {swap_user["id"], sam}
 
     stories = client.get(f"{P}/feed/stories", headers=swap_user["headers"]).json()
-    assert stories[0]["profile"]["id"] == sam and stories[0]["tag"] == "swap" and stories[0]["trade"]
+    # Order is score-driven, and the generated profiles add other swaps; Sam only has to be present
+    # as a swap with a trade, not first.
+    story = next((s for s in stories if s["profile"]["id"] == sam), None)
+    assert story and story["tag"] == "swap" and story["trade"]
 
     inv = client.post(f"{P}/cycles/invite", json={"cycle_id": swap["id"]}, headers=swap_user["headers"])
     assert inv.status_code == 201, inv.text
