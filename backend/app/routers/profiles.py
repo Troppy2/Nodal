@@ -1,3 +1,4 @@
+import re
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 
@@ -61,7 +62,9 @@ def search_profiles(
     candidates.sort(key=lambda x: (x[0], x[1]))
     results = [profile_lite(item[2]) for item in candidates[:limit]]
 
-    if len(results) < limit and needle:
+    # PostgREST filter grammar treats , ( ) . : * % " as syntax, so only plain characters reach the query.
+    safe = re.sub(r"[^a-z0-9_\- ]", "", needle)
+    if len(results) < limit and safe:
         seen = {r["id"] for r in results}
         if viewer_id:
             seen.add(viewer_id)
@@ -70,7 +73,7 @@ def search_profiles(
                 service_client()
                 .table("profiles")
                 .select(PROFILE_COLS)
-                .or_(f"handle.ilike.%{needle}%,display_name.ilike.%{needle}%")
+                .or_(f"handle.ilike.%{safe}%,display_name.ilike.%{safe}%")
                 .limit(limit)
                 .execute()
                 .data
