@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { CollabButton } from "@/components/CollabDialog";
@@ -21,6 +21,7 @@ import { btn } from "@/lib/styles";
 import { invalidate, useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 import { CoolFactorCard } from "./CoolFactorCard";
+import { ClampToHeight } from "./ClampToHeight";
 import { CheckSkeleton, LiveRun } from "./LiveRun";
 import { ResearchReport } from "./ResearchReport";
 import { EmptyState, ErrorState } from "./States";
@@ -150,6 +151,8 @@ export function ResultsView({ id }: { id: string }) {
   const research = useResearch(id, Boolean(isIdea));
   const [check, setCheck] = useState<CheckId>("market");
   const [mobileTab, setMobileTab] = useState<MobileTab>("people");
+  const peopleRef = useRef<HTMLElement>(null);
+  const peopleHeight = useSideBySideHeight(peopleRef);
   // Only type the summary when this visit watched the run happen; a cached report opens instantly.
   const router = useRouter();
   const [watchedRunning, setWatchedRunning] = useState(false);
@@ -267,6 +270,7 @@ export function ResultsView({ id }: { id: string }) {
 
         <div className={cn("lg:mt-6", isIdea ? "lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-6" : "lg:max-w-[760px]")}>
           <section
+            ref={peopleRef}
             aria-labelledby="people-title"
             className={cn("px-4 py-5 lg:block lg:rounded-xl lg:border lg:border-line lg:p-5", shownTab !== "people" && "hidden")}
           >
@@ -289,6 +293,7 @@ export function ResultsView({ id }: { id: string }) {
                 shownTab === "people" && "hidden",
               )}
             >
+              <ClampToHeight maxHeight={peopleHeight === null ? null : peopleHeight - CHEVRON_ROW}>
               <TabStrip<CheckId>
                 fill
                 value={check}
@@ -319,10 +324,34 @@ export function ResultsView({ id }: { id: string }) {
                   />
                 </label>
               )}
+              </ClampToHeight>
             </section>
           )}
         </div>
       </div>
     </>
   );
+}
+
+/** Height of the "Show more" row, so the clamped checks panel plus it ends level with the People panel. */
+const CHEVRON_ROW = 46;
+
+/** The People panel's height while the two panels sit side by side (lg and up); null when stacked. */
+function useSideBySideHeight(ref: React.RefObject<HTMLElement | null>): number | null {
+  const [height, setHeight] = useState<number | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const wide = window.matchMedia("(min-width: 1024px)");
+    const update = () => setHeight(wide.matches ? el.offsetHeight : null);
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    wide.addEventListener("change", update);
+    update();
+    return () => {
+      ro.disconnect();
+      wide.removeEventListener("change", update);
+    };
+  }, [ref]);
+  return height;
 }
