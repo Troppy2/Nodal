@@ -143,6 +143,7 @@ There are 49 backend tests. They create real Supabase users and clean up after t
 
 ## 10. Useful links
 
+- Slides: [`Nodal-Social-Hack-2026-slides.pdf`](Nodal-Social-Hack-2026-slides.pdf)
 - Demo script: [`DEMO.md`](DEMO.md) · what to show and why: [`DEMO_GUIDE.md`](DEMO_GUIDE.md)
 - Run guide: [`RUNNING.md`](RUNNING.md)
 - Gap audit: [`FEATURE_GAPS.md`](FEATURE_GAPS.md)
@@ -160,3 +161,4 @@ There are 49 backend tests. They create real Supabase users and clean up after t
 - 2026-10-25: Deleted 6 test projects from hosted data (efficient miner, Mobile game 1-3, two Scraps; one ◈10 bounty refunded). The seeded ring test passes again, so the seed trim is no longer needed. Profile search: input is sanitised before reaching the PostgREST `or_` filter (filter injection).
 - 2026-10-25: TALK.md, DEMO_GUIDE.md and DEMO.md share one structure: Intersect → Connect → Collaborate. The talk includes the speech fixes; the guide groups features by beat.
 - 2026-10-25: Home feed tabs cut to For you, Following, Needs you, Intersections. Ideas and Projects were removed because the Projects page and Explore already cover them. The backend still accepts `tab=ideas|projects`.
+- 2026-10-25: Added the presentation deck as `docs/Nodal-Social-Hack-2026-slides.pdf`.
