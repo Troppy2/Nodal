@@ -67,6 +67,7 @@ class NeedOut(BaseModel):
 
 class ProjectCard(BaseModel):
     id: str
+    slug: str | None = None
     title: str
     summary: str
     type: ProjectType

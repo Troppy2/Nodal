@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Check, ChevronLeft, Clock, Handshake, Loader2, Sparkles, UserCheck, X } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Avatar } from "@/components/Avatar";
 import { EmptyState, ErrorState, RowsSkeleton } from "@/components/checks/States";
@@ -16,6 +15,7 @@ import { invalidate, useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 import { ago, describe, displayName, joinNames } from "./format";
 import { RingInviteCard } from "./RingInviteCard";
+import { CustomSwapDialog } from "./CustomSwapDialog";
 
 type DirectionTab = "received" | "sent";
 type StatusFilter = "all" | "pending" | "accepted" | "declined";
@@ -278,98 +278,7 @@ function CycleSuggestions({
   );
 }
 
-function CustomSwapDialog({
-  open,
-  onClose,
-  onCreated,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onCreated: (item: InboxItem) => void;
-}) {
-  const [partnerHandle, setPartnerHandle] = useState("");
-  const [myProjectId, setMyProjectId] = useState("");
-  const [theirProjectId, setTheirProjectId] = useState("");
-  const [submitting, setSubmitting] = useState(false);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!partnerHandle.trim() || !myProjectId.trim() || !theirProjectId.trim()) return;
-    setSubmitting(true);
-    try {
-      const partner = await api<{ profile: ProfileLite }>(`/profiles/${partnerHandle.trim().replace(/^@/, "")}`);
-      const item = await api<InboxItem>("/cycles/custom-swap", {
-        method: "POST",
-        body: {
-          partner_id: partner.profile.id,
-          my_project_id: myProjectId.trim(),
-          my_skill_id: 1,
-          their_project_id: theirProjectId.trim(),
-          their_skill_id: 1,
-        },
-      });
-      toast.success("Swap proposal sent! Partner notified in their inbox.");
-      onCreated(item);
-      onClose();
-    } catch (err) {
-      toast.error((err as Error).message);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogTitle>Propose a skill swap</DialogTitle>
-        <DialogDescription>
-          Agree to help each other&apos;s project with 0 Tolken exchanged. When both accept, you both join each other&apos;s team.
-        </DialogDescription>
-        <form onSubmit={submit} className="mt-4 flex flex-col gap-3.5">
-          <div>
-            <label className="block text-xs font-semibold mb-1">Partner Handle</label>
-            <input
-              value={partnerHandle}
-              onChange={(e) => setPartnerHandle(e.target.value)}
-              placeholder="e.g. alex or sarah"
-              className="h-10 w-full rounded-lg border border-line px-3 text-sm outline-none focus:border-ink"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold mb-1">Your Project ID / Slug</label>
-            <input
-              value={myProjectId}
-              onChange={(e) => setMyProjectId(e.target.value)}
-              placeholder="Your project ID that needs their help"
-              className="h-10 w-full rounded-lg border border-line px-3 text-sm outline-none focus:border-ink"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold mb-1">Their Project ID / Slug</label>
-            <input
-              value={theirProjectId}
-              onChange={(e) => setTheirProjectId(e.target.value)}
-              placeholder="Their project ID you want to help"
-              className="h-10 w-full rounded-lg border border-line px-3 text-sm outline-none focus:border-ink"
-              required
-            />
-          </div>
-          <div className="flex justify-end gap-2 border-t border-line pt-3 mt-1">
-            <button type="button" onClick={onClose} className={btn.secondary}>
-              Cancel
-            </button>
-            <button type="submit" disabled={submitting} className={btn.primary}>
-              {submitting && <Loader2 className="size-4 animate-spin mr-1.5" />}
-              Send swap proposal
-            </button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 export function RequestsView() {
   const router = useRouter();

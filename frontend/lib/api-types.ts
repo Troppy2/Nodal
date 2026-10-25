@@ -43,6 +43,7 @@ export interface NeedOut {
 
 export interface ProjectCard {
   id: string;
+  slug?: string;
   title: string;
   summary: string;
   type: ProjectType;
