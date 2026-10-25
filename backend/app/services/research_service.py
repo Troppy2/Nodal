@@ -96,12 +96,18 @@ def run_live(run_id: str, project: dict, checks: list[str], web=None, llm=None) 
 
     def on_step(label: str) -> None:
         with lock:
-            steps.append({"at": now(), "label": label})
+            steps.append({"at": now(), "label": label, "kind": "step"})
+            sb.table("research_runs").update({"steps": list(steps)}).eq("id", run_id).execute()
+
+    def on_fact(claim: str, source: str) -> None:
+        """A finding, written as soon as its page finishes, so the UI streams while other pages read."""
+        with lock:
+            steps.append({"at": now(), "label": claim, "kind": "fact", "source": source})
             sb.table("research_runs").update({"steps": list(steps)}).eq("id", run_id).execute()
 
     def market() -> str:
         try:
-            out = pipeline.market_check(project, web, llm, on_step, deadline)
+            out = pipeline.market_check(project, web, llm, on_step, deadline, on_fact=on_fact)
             write({"report": out["report"], "sources": out["sources"]})
             return "done"
         except pipeline.Deadline as exc:

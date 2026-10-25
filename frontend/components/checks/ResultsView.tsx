@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { Check, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { CollabButton } from "@/components/CollabDialog";
 import { CoverArt } from "@/components/feed/CoverArt";
 import { Label, ProjectMeta } from "@/components/Meta";
@@ -13,12 +13,13 @@ import { MobileHeader } from "@/components/shell/MobileHeader";
 import { TabStrip } from "@/components/Tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError } from "@/lib/api";
-import type { GraphOut, MatchOut, ProjectDetail, ResearchOut } from "@/lib/api-types";
+import type { GraphOut, MatchOut, ProjectDetail } from "@/lib/api-types";
 import { useSession } from "@/lib/session";
 import { btn } from "@/lib/styles";
 import { useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 import { CoolFactorCard } from "./CoolFactorCard";
+import { CheckSkeleton, LiveRun } from "./LiveRun";
 import { ResearchReport } from "./ResearchReport";
 import { EmptyState, ErrorState } from "./States";
 import { type CheckId, useResearch } from "./use-research";
@@ -30,31 +31,25 @@ const blurb: Record<CheckId, string> = {
   cool: "Scores novelty, demo appeal, fun to build with others, and weekend-sized scope. Ignores money.",
 };
 
-function RunSteps({ run }: { run: ResearchOut }) {
-  const steps = [...run.steps].reverse();
-  return (
-    <ol className="flex flex-col gap-2 py-2" aria-live="polite">
-      {steps.length === 0 && (
-        <li className="flex items-center gap-2 text-sm">
-          <Loader2 className="size-4 animate-spin" /> Starting
-        </li>
-      )}
-      {steps.map((s, i) => (
-        <li key={`${s.label}-${i}`} className={cn("flex items-center gap-2 text-sm", i === 0 ? "text-ink" : "text-muted-ink")}>
-          {i === 0 ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4 text-teal" />}
-          {s.label}
-        </li>
-      ))}
-    </ol>
-  );
-}
-
-function CheckBody({ check, research, own }: { check: CheckId; research: ReturnType<typeof useResearch>; own: boolean }) {
+function CheckBody({
+  check,
+  research,
+  own,
+  typeIn,
+}: {
+  check: CheckId;
+  research: ReturnType<typeof useResearch>;
+  own: boolean;
+  typeIn: boolean;
+}) {
   const { run, loading, error, starting, start, reload } = research;
-  if (loading) return <Skeleton className="h-40 rounded-lg" />;
+  if (loading) return <CheckSkeleton check={check} />;
   if (error) return <ErrorState error={error} onRetry={reload} className="py-6" />;
   const covers = run?.checks.includes(check);
-  if (run && covers && (run.status === "queued" || run.status === "running")) return <RunSteps run={run} />;
+  // One check can finish while the other is still running; show the finished one immediately.
+  if (run && check === "market" && run.report) return <ResearchReport run={run} typeIn={typeIn} />;
+  if (run && check === "cool" && run.cool) return <CoolFactorCard run={run} typeIn={typeIn} />;
+  if (run && covers && (run.status === "queued" || run.status === "running")) return <LiveRun run={run} check={check} />;
   if (run && covers && run.status === "failed") {
     return (
       <EmptyState
@@ -71,8 +66,6 @@ function CheckBody({ check, research, own }: { check: CheckId; research: ReturnT
       />
     );
   }
-  if (run && check === "market" && run.report) return <ResearchReport run={run} />;
-  if (run && check === "cool" && run.cool) return <CoolFactorCard run={run} />;
   if (!own) {
     return (
       <p className="py-2 text-sm text-muted-ink">
@@ -155,6 +148,12 @@ export function ResultsView({ id }: { id: string }) {
   const research = useResearch(id, Boolean(isIdea));
   const [check, setCheck] = useState<CheckId>("market");
   const [mobileTab, setMobileTab] = useState<MobileTab>("people");
+  // Only type the summary when this visit watched the run happen; a cached report opens instantly.
+  const [watchedRunning, setWatchedRunning] = useState(false);
+  const runStatus = research.run?.status;
+  useEffect(() => {
+    if (runStatus === "queued" || runStatus === "running") setWatchedRunning(true);
+  }, [runStatus]);
 
   if (error) {
     return error instanceof ApiError && error.status === 404 ? (
@@ -183,14 +182,21 @@ export function ResultsView({ id }: { id: string }) {
 
   const run = research.run;
   const done = (["market", "cool"] as const).filter((c) => (c === "market" ? run?.report : run?.cool)).length;
+  const running = Boolean(run && (run.status === "queued" || run.status === "running"));
   const fit = project.people_fit;
   const status = !isIdea
     ? `${fit} ${fit === 1 ? "person fits" : "people fit"}`
-    : done === 2
-      ? "Both checks finished"
-      : done === 1
-        ? "One check finished"
-        : "No checks run yet";
+    : running
+      ? run!.checks.length > 1
+        ? "Both checks running"
+        : run!.checks[0] === "market"
+          ? "Market check running"
+          : "Cool factor running"
+      : done === 2
+        ? "Both checks finished"
+        : done === 1
+          ? "One check finished"
+          : "No checks run yet";
   const shownTab: MobileTab = isIdea ? mobileTab : "people";
   const openNeeds = project.needs.filter((n) => n.status === "open").length;
 
@@ -269,7 +275,7 @@ export function ResultsView({ id }: { id: string }) {
               />
               {(["market", "cool"] as const).map((c) => (
                 <div key={c} className={cn("lg:p-5", shownTab === c ? "block" : "hidden", check === c ? "lg:block" : "lg:hidden")}>
-                  <CheckBody check={c} research={research} own={own} />
+                  <CheckBody check={c} research={research} own={own} typeIn={watchedRunning} />
                 </div>
               ))}
               {own && run && (run.report || run.cool) && (

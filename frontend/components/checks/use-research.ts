@@ -7,7 +7,7 @@ import type { ResearchOut } from "@/lib/api-types";
 
 export type CheckId = "market" | "cool";
 
-const POLL_MS = 2000;
+const POLL_MS = 500;
 const POLL_CAP_MS = 4 * 60 * 1000;
 const finished = (s: ResearchOut["status"]) => s === "done" || s === "partial" || s === "failed";
 

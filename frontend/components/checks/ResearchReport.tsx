@@ -1,5 +1,6 @@
 import { Label } from "@/components/Meta";
 import type { ResearchOut } from "@/lib/api-types";
+import { Typewriter } from "./Typewriter";
 
 type Cited = { text: string; fact_ids: string[] };
 
@@ -33,7 +34,7 @@ function domainPath(url: string) {
 }
 
 /** Market check report. All text renders as plain text; every cited item links its numbered sources. */
-export function ResearchReport({ run }: { run: ResearchOut }) {
+export function ResearchReport({ run, typeIn = false }: { run: ResearchOut; typeIn?: boolean }) {
   const report = run.report as unknown as MarketReport;
   const sources = run.sources ?? [];
   const sourceIndex = (factIds: string[]) =>
@@ -83,7 +84,9 @@ export function ResearchReport({ run }: { run: ResearchOut }) {
         {run.is_sample && <Label className="shrink-0 rounded-md border border-line px-2 py-1">Sample report (demo data)</Label>}
       </div>
       {run.status === "partial" && <p className="mt-3 text-sm text-cool">Partial report: the run timed out.</p>}
-      <p className="mt-3 text-[15px] leading-relaxed">{report.summary}</p>
+      <p className="mt-3 text-[15px] leading-relaxed">
+        <Typewriter text={report.summary} instant={!typeIn} speed={6} />
+      </p>
 
       {report.competitors?.length > 0 && (
         <section className="mt-5">

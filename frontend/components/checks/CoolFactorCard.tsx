@@ -1,5 +1,6 @@
 import { Label } from "@/components/Meta";
 import type { ResearchOut } from "@/lib/api-types";
+import { Typewriter } from "./Typewriter";
 
 const measureLabel: Record<string, string> = {
   novelty: "Novelty",
@@ -9,7 +10,7 @@ const measureLabel: Record<string, string> = {
 };
 
 /** Cool factor: an AI opinion on how fun the idea is to watch and build. It ignores money. */
-export function CoolFactorCard({ run }: { run: ResearchOut }) {
+export function CoolFactorCard({ run, typeIn = false }: { run: ResearchOut; typeIn?: boolean }) {
   const cool = run.cool!;
   return (
     <div>
@@ -23,7 +24,9 @@ export function CoolFactorCard({ run }: { run: ResearchOut }) {
         </div>
         {run.is_sample && <Label className="shrink-0 rounded-md border border-line px-2 py-1">Sample (demo data)</Label>}
       </div>
-      <p className="mt-2 text-[15px] leading-relaxed">{cool.why}</p>
+      <p className="mt-2 text-[15px] leading-relaxed">
+        <Typewriter text={cool.why} instant={!typeIn} speed={6} />
+      </p>
       <ul className="mt-5 flex flex-col gap-4">
         {cool.measures.map((m) => {
           const label = measureLabel[m.key] ?? m.key;

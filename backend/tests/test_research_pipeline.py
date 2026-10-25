@@ -57,6 +57,14 @@ def test_market_check_cites_and_drops_unknown():
     assert any(s.startswith("Reading: ") for s in steps)
 
 
+def test_market_check_streams_facts_and_keeps_source_citations():
+    seen: list[tuple[str, str]] = []
+    out = rp.market_check(IDEA, FakeWeb(), fake_llm(), lambda _: None, time.monotonic() + 60,
+                          on_fact=lambda claim, source: seen.append((claim, source)))
+    assert seen and all(claim and source for claim, source in seen)
+    assert all(s["fact_ids"] for s in out["sources"])
+
+
 def test_market_check_forces_not_enough_evidence_on_thin_sources():
     out = rp.market_check(IDEA, FakeWeb(), fake_llm(("f1", "f2")), lambda _: None, time.monotonic() + 60)
     assert out["report"]["verdict"] == "not_enough_evidence"
@@ -137,6 +145,8 @@ def test_run_live_writes_results(monkeypatch, checks, status):
     assert sb.row["report"]["verdict"] == "promising"
     assert ("cool" in sb.row) == ("cool" in checks)
     assert sb.row["steps"][0]["label"] in ("Planning searches", "Looking around: similar projects")
+    if "market" in checks:
+        assert any(s.get("kind") == "fact" for s in sb.row["steps"])
 
 
 def test_run_live_llm_failure_marks_failed(monkeypatch):

@@ -253,7 +253,7 @@ export interface ResearchOut {
   project_id: string;
   status: "queued" | "running" | "done" | "partial" | "failed";
   checks: ("market" | "cool")[];
-  steps: { at: string; label: string }[];
+  steps: { at: string; label: string; kind?: "step" | "fact"; source?: string }[];
   report: Record<string, unknown> | null;
   sources: { id: string; url: string; title: string; fact_ids?: string[] }[] | null;
   cool: { overall: number; measures: { key: string; score: number; reason: string }[]; why: string } | null;

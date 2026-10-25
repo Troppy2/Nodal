@@ -8,6 +8,7 @@ Fetched pages and snippets are untrusted. They only ever appear inside <data> bl
 told to ignore instructions inside them, it has no tools, and every output is schema-validated and
 then citation-checked here."""
 
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Literal
@@ -159,8 +160,12 @@ def check_report(report: Report, facts: dict[str, dict]) -> dict:
     return report.model_dump()
 
 
-def market_check(project: dict, web: WebResearch, llm, on_step: Callable[[str], None], deadline: float) -> dict:
-    """Returns {report, sources}. Raises Deadline with `.partial` set when time runs out after facts exist."""
+def market_check(project: dict, web: WebResearch, llm, on_step: Callable[[str], None], deadline: float,
+                 on_fact: Callable[[str, str], None] | None = None) -> dict:
+    """Returns {report, sources}. Raises Deadline with `.partial` set when time runs out after facts exist.
+
+    `on_fact(claim, domain)` fires as each page is processed, so the UI can stream findings while the
+    rest of the pages are still being read. Pages are extracted in parallel; ids follow completion order."""
     on_step("Planning searches")
     queries = plan_queries(project, llm)
     _check_time(deadline)
@@ -176,28 +181,52 @@ def market_check(project: dict, web: WebResearch, llm, on_step: Callable[[str], 
     pages = pick_pages(hits, settings.research_max_pages)
     for p in pages:
         on_step(f"Reading: {_domain(p['url'])}")
-    fetched = _safe(lambda: web.fetch([p["url"] for p in pages]), {})
 
     on_step("Extracting facts")
     facts: dict[str, dict] = {}
     sources: list[dict] = []
-    try:
-        for p in pages:
-            if p["url"] not in fetched:
-                continue
-            _check_time(deadline)
-            page_facts = _safe(lambda: extract_facts(project, p["url"], fetched[p["url"]], llm), [])
-            if not page_facts:
-                continue
+    lock = threading.Lock()
+
+    def read_one(page: dict, page_data: dict) -> None:
+        page_facts = _safe(lambda: extract_facts(project, page["url"], page_data, llm), [])
+        if not page_facts:
+            return
+        _check_time(deadline)
+        with lock:
             sid = f"s{len(sources) + 1}"
-            sources.append({"id": sid, "url": p["url"], "title": fetched[p["url"]]["title"] or p["title"]})
+            source = {"id": sid, "url": page["url"], "title": page_data["title"] or page["title"],
+                      "fact_ids": []}
+            sources.append(source)
             for f in page_facts:
-                facts[f"f{len(facts) + 1}"] = {**f.model_dump(), "source_id": sid}
+                fid = f"f{len(facts) + 1}"
+                facts[fid] = {**f.model_dump(), "source_id": sid}
+                source["fact_ids"].append(fid)
+        if on_fact:
+            for f in page_facts:
+                on_fact(f.claim, _domain(page["url"]))
+
+    def read_chunk(chunk: list[dict]) -> None:
+        """Fetch a few pages, then extract them, so findings start streaming before the last page lands."""
+        _check_time(deadline)
+        got = _safe(lambda: web.fetch([p["url"] for p in chunk]), {})
+        todo = [p for p in chunk if p["url"] in got]
+        if not todo:
+            return
+        with ThreadPoolExecutor(max_workers=min(4, len(todo))) as pool:
+            list(pool.map(lambda p: read_one(p, got[p["url"]]), todo))
+
+    try:
+        # Small chunks fetched at once: the fast pages report early instead of waiting on a slow one.
+        chunks = [pages[i:i + 3] for i in range(0, len(pages), 3)]
+        if chunks:
+            with ThreadPoolExecutor(max_workers=min(3, len(chunks))) as pool:
+                list(pool.map(read_chunk, chunks))
         _check_time(deadline)
     except Deadline as exc:
         exc.partial = {"report": None, "sources": sources, "facts": facts} if facts else None
         raise
 
+    on_step(f"Found {len(facts)} facts across {len(sources)} sources")
     on_step("Writing report")
     fact_lines = "\n".join(f"{fid} [{f['type']}] {f['claim']} (quote: \"{f['quote']}\")" for fid, f in facts.items())
     report = llm([{"role": "system", "content": "You write a short, honest market check for a product idea. Use only the facts "
@@ -209,7 +238,9 @@ def market_check(project: dict, web: WebResearch, llm, on_step: Callable[[str], 
     cited = {fid for k in ("competitors", "demand_signals", "market_size", "business_models", "risks")
              for item in checked[k] for fid in item["fact_ids"]}
     used = {facts[f]["source_id"] for f in cited}
-    return {"report": checked, "sources": [s for s in sources if s["id"] in used]}
+    # Keep cited fact ids on each source so the UI can render inline [n] citations.
+    kept = [{**s, "fact_ids": [fid for fid in s["fact_ids"] if fid in cited]} for s in sources if s["id"] in used]
+    return {"report": checked, "sources": kept}
 
 
 def _safe(fn, default):
