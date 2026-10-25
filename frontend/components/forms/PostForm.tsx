@@ -32,6 +32,7 @@ export function PostForm() {
   const { ready, signedIn, me } = useSession();
   const router = useRouter();
   const [stage, setStage] = useState<"idea" | "building">("idea");
+  const [coverUrl, setCoverUrl] = useState("");
   const [type, setType] = useState<ProjectType | null>(null);
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
@@ -77,6 +78,7 @@ export function PostForm() {
           type,
           stage,
           readme_md: readme.trim() || null,
+          cover_url: coverUrl.trim() || null,
           tags,
           needs: needs.map((n) => ({
             skill_id: n.skill.id,
@@ -213,6 +215,26 @@ export function PostForm() {
               </div>
               {err(errors.type)}
             </fieldset>
+          </div>
+
+          
+          <div>
+            <label htmlFor="cover-url" className="mb-2 block text-sm font-semibold">
+              Cover image URL <span className="text-xs font-normal text-muted-ink">(optional)</span>
+            </label>
+            <input
+              id="cover-url"
+              value={coverUrl}
+              onChange={(e) => setCoverUrl(e.target.value)}
+              placeholder="https://images.unsplash.com/... or any image URL"
+              className={cn(input, "h-11 border-line")}
+            />
+            {coverUrl.trim() && (
+              <div className="mt-2.5 h-32 overflow-hidden rounded-lg border border-line relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={coverUrl.trim()} alt="Cover preview" className="h-full w-full object-cover" />
+              </div>
+            )}
           </div>
 
           <div>

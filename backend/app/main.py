@@ -8,7 +8,7 @@ from . import errors, keycheck
 from .config import settings
 from .limits import limiter
 from .routers import (
-    auth, collab, comments, feed, graph, ideas, inbox, matches, me, messages, profiles, projects, recommendations,
+    auth, collab, comments, feed, graph, ideas, inbox, matches, me, messages, notifications, profiles, projects, recommendations,
     research, skills, social, source, team, tolken,
 )
 from .slugs import SlugMiddleware
@@ -59,6 +59,6 @@ def health():
 
 for module in (
     auth, projects, skills, comments, collab, social, profiles, me, source,
-    matches, graph, feed, recommendations, ideas, inbox, messages, team, tolken, research,
+    matches, graph, feed, recommendations, ideas, inbox, messages, team, tolken, research, notifications,
 ):
     app.include_router(module.router, prefix="/api/v1")

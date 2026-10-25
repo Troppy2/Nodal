@@ -113,3 +113,12 @@ def respond(request_id: str, body: RespondIn, user: dict = Depends(get_current_u
                 "status": "pending_funding",
             }).execute()
     return collab_out(updated)[0]
+
+@router.get("/projects/{project_id}/collab-requests", response_model=list[CollabOut])
+def project_requests(project_id: str, user: dict = Depends(get_current_user)):
+    project = project_row(project_id)
+    if project["owner_id"] != user["id"]:
+        raise HTTPException(403, "Only the project owner can view requests")
+    rows = service_client().table("collab_requests").select("*").eq("project_id", project_id).order("created_at", desc=True).execute().data
+    return collab_out(rows)
+

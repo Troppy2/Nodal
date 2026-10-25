@@ -35,7 +35,7 @@ export interface NeedOut {
   skill: Skill;
   note: string | null;
   bounty_tolken: number | null;
-  status: "open" | "filled";
+  status: "open" | "claimed" | "filled";
   fitters: ProfileLite[];
   viewer_fits: boolean;
   viewer_requested: boolean;
@@ -295,4 +295,24 @@ export interface NeedPatch {
   note?: string | null;
   bounty_tolken?: number | null;
   status?: "open" | "filled" | null;
+}
+
+export interface NotificationItem {
+  id: string;
+  kind: "star" | "comment" | "follow" | "bounty" | "collab" | "invite";
+  actor: ProfileLite;
+  project_id: string | null;
+  project_title: string | null;
+  message: string;
+  created_at: string;
+  link: string;
+}
+
+export interface CustomSwapIn {
+  partner_id: string;
+  my_project_id: string;
+  my_skill_id: number;
+  their_project_id: string;
+  their_skill_id: number;
+  message?: string | null;
 }

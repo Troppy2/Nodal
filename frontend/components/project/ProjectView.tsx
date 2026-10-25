@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { Check, Loader2, Pencil, Plus, Rocket, Star, Trash2, X } from "lucide-react";
+import { Award, Check, Loader2, Pencil, Plus, Rocket, Share2, Star, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar } from "@/components/Avatar";
 import { CollabButton } from "@/components/CollabDialog";
@@ -15,7 +15,7 @@ import { TabStrip } from "@/components/Tabs";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError } from "@/lib/api";
-import type { CommentOut, NeedOut, ProjectDetail, ProjectPatch, Skill, Stage, TolkenOut } from "@/lib/api-types";
+import type { CollabOut, CommentOut, NeedOut, ProjectDetail, ProjectPatch, Skill, Stage, TolkenOut } from "@/lib/api-types";
 import { formatTolken, TOLKEN } from "@/lib/cover";
 import { useSession } from "@/lib/session";
 import { btn } from "@/lib/styles";
@@ -558,11 +558,82 @@ function Fitters({ need }: { need: NeedOut }) {
 }
 
 function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner: boolean; onReload: () => void }) {
+  const { me } = useSession();
+  const searchParams = useSearchParams();
+  const highlightedBountyId = searchParams.get("bounty");
   const ledger = useApi<TolkenOut>(owner ? "/me/tolken" : null);
+  const collabReqs = useApi<CollabOut[]>(owner ? `/projects/${project.id}/collab-requests` : null);
   const [funding, setFunding] = useState<string | null>(null);
   const [addingNeed, setAddingNeed] = useState(false);
   const [editingNeed, setEditingNeed] = useState<NeedOut | null>(null);
   const [busyNeed, setBusyNeed] = useState<string | null>(null);
+  const [actingWork, setActingWork] = useState<string | null>(null);
+
+  const pendingRequests = collabReqs.data?.filter((r) => r.status === "pending") ?? [];
+  const onTeam = Boolean(me && project.members.some((m) => m.profile.id === me.profile.id));
+
+  async function respondRequest(requestId: string, status: "accepted" | "declined") {
+    try {
+      await api(`/collab-requests/${requestId}/respond`, { method: "POST", body: { status } });
+      toast.success(status === "accepted" ? "Contributor accepted to team!" : "Request declined");
+      collabReqs.reload();
+      invalidate(`/projects/${project.id}`);
+      onReload();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }
+
+  async function submitWork(need: NeedOut) {
+    setActingWork(need.id);
+    try {
+      await api(`/projects/${project.id}/needs/${need.id}/submit-work`, { method: "POST" });
+      toast.success("Work submitted for review! Owner notified.");
+      invalidate(`/projects/${project.id}`);
+      onReload();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setActingWork(null);
+    }
+  }
+
+  async function confirmWork(need: NeedOut) {
+    if (!confirm(`Confirm work completed for ${need.skill.name}? This will mark the task finished and release any funded Tolken bounty.`)) return;
+    setActingWork(need.id);
+    try {
+      await api(`/projects/${project.id}/needs/${need.id}/confirm-work`, { method: "POST" });
+      toast.success("🎉 Work confirmed & bounty released!");
+      invalidate(`/projects/${project.id}`, "/me/tolken", "/me");
+      onReload();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setActingWork(null);
+    }
+  }
+
+  async function shareBounty(need: NeedOut) {
+    const url = `${window.location.origin}/projects/${project.id}?bounty=${need.id}&tab=needs`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Bounty: ${need.bounty_tolken ?? 0} Tolken for ${need.skill.name}`,
+          text: `Help build ${project.title} on Nodal!`,
+          url,
+        });
+        return;
+      } catch {
+        // Fallback to clipboard
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Bounty link copied! Share with friends or Twitter/X.");
+    } catch {
+      toast(url);
+    }
+  }
 
   async function fund(need: NeedOut) {
     setFunding(need.id);
@@ -614,6 +685,42 @@ function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner:
 
   return (
     <div className="flex flex-col gap-4">
+      {owner && pendingRequests.length > 0 && (
+        <div className="rounded-xl border border-teal/40 bg-teal-tint/30 p-4 mb-2">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="size-2 rounded-full bg-teal animate-pulse" />
+            <h3 className="text-sm font-bold text-ink">Incoming Collaborator Requests ({pendingRequests.length})</h3>
+          </div>
+          <div className="flex flex-col gap-2.5">
+            {pendingRequests.map((req) => (
+              <div key={req.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-lg border border-line">
+                <div className="flex items-start gap-3 min-w-0">
+                  <Avatar person={req.from_profile} size={36} />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Link href={`/u/${req.from_profile.handle}`} className="font-bold text-sm hover:underline truncate">
+                        {req.from_profile.display_name || req.from_profile.handle}
+                      </Link>
+                      <span className="text-xs bg-sunken px-2 py-0.5 rounded font-medium text-muted-ink">
+                        for {req.skill.name}
+                      </span>
+                    </div>
+                    {req.message && <p className="text-xs text-muted-ink mt-0.5 line-clamp-2">{req.message}</p>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button onClick={() => respondRequest(req.id, "accepted")} className={cn(btn.match, "h-8 px-3 text-xs")}>
+                    Accept
+                  </button>
+                  <button onClick={() => respondRequest(req.id, "declined")} className={cn(btn.secondary, "h-8 px-2.5 text-xs")}>
+                    Decline
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {owner && (
         <div className="flex items-center justify-between border-b border-line pb-3">
           <p className="text-sm font-semibold">
@@ -641,13 +748,29 @@ function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner:
         <ul className="flex flex-col divide-y divide-line rounded-xl border border-line">
           {project.needs.map((n) => {
             const entry = ledger.data?.ledger.find((e) => e.need_id === n.id && ["funded", "released"].includes(e.status));
+            const isHighlighted = highlightedBountyId === n.id;
             return (
-              <li key={n.id} className={cn("flex flex-col gap-3 p-4 sm:flex-row sm:items-center", n.viewer_fits && n.status === "open" && "bg-teal-tint/50")}>
+              <li
+                key={n.id}
+                id={`need-${n.id}`}
+                className={cn(
+                  "flex flex-col gap-3 p-4 sm:flex-row sm:items-center transition-all duration-300",
+                  n.viewer_fits && n.status === "open" && "bg-teal-tint/50",
+                  isHighlighted && "ring-2 ring-teal bg-teal-tint/30 rounded-lg",
+                  n.status === "claimed" && "bg-amber-500/5",
+                )}
+              >
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-baseline gap-x-2 font-semibold">
                     {n.skill.name}
-                    {n.bounty_tolken && <span className="text-xs font-medium text-teal">{formatTolken(n.bounty_tolken)} bounty</span>}
+                    {n.bounty_tolken && (
+                      <span className="inline-flex items-center gap-1 rounded bg-teal/10 px-1.5 py-0.5 text-xs font-bold text-teal">
+                        <Award className="size-3" />
+                        {formatTolken(n.bounty_tolken)} bounty
+                      </span>
+                    )}
                     {n.status === "filled" && <span className="rounded bg-sunken px-1.5 py-0.5 text-xs font-medium text-muted-ink">Filled</span>}
+                    {n.status === "claimed" && <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-xs font-semibold text-amber-700">Work Submitted</span>}
                     {n.viewer_fits && n.status === "open" && <span className="text-xs text-teal">You fit</span>}
                   </p>
                   {n.note && <p className="mt-0.5 text-sm text-muted-ink">{n.note}</p>}
@@ -657,6 +780,18 @@ function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner:
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                  {n.bounty_tolken ? (
+                    <button
+                      type="button"
+                      onClick={() => shareBounty(n)}
+                      className={cn(btn.ghost, "h-8 px-2 text-xs text-muted-ink hover:text-ink")}
+                      title="Share bounty link"
+                    >
+                      <Share2 className="size-3.5 mr-1" />
+                      <span className="hidden sm:inline">Share</span>
+                    </button>
+                  ) : null}
+
                   {owner ? (
                     <>
                       {n.bounty_tolken ? (
@@ -672,14 +807,26 @@ function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner:
                         )
                       ) : null}
 
-                      <button
-                        onClick={() => toggleStatus(n)}
-                        disabled={busyNeed === n.id}
-                        className={cn(btn.ghost, "h-8 px-2 text-xs")}
-                        title={n.status === "open" ? "Mark as filled" : "Reopen need"}
-                      >
-                        {n.status === "open" ? <Check className="size-3.5" /> : "Reopen"}
-                      </button>
+                      {n.status === "claimed" ? (
+                        <button
+                          onClick={() => confirmWork(n)}
+                          disabled={actingWork === n.id}
+                          className={cn(btn.match, "h-8 px-3 text-xs")}
+                        >
+                          {actingWork === n.id && <Loader2 className="size-3.5 animate-spin mr-1" />}
+                          Confirm Work & Release
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => toggleStatus(n)}
+                          disabled={busyNeed === n.id}
+                          className={cn(btn.ghost, "h-8 px-2 text-xs")}
+                          title={n.status === "open" ? "Mark as filled" : "Reopen need"}
+                        >
+                          {n.status === "open" ? <Check className="size-3.5" /> : "Reopen"}
+                        </button>
+                      )}
+
                       <button onClick={() => setEditingNeed(n)} className={cn(btn.ghost, "h-8 px-2 text-xs")} title="Edit need">
                         <Pencil className="size-3.5" />
                       </button>
@@ -687,9 +834,28 @@ function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner:
                         <Trash2 className="size-3.5" />
                       </button>
                     </>
-                  ) : n.status === "open" ? (
-                    <CollabButton project={project} skillId={n.skill.id} label="Offer" className="w-full sm:w-auto" />
-                  ) : null}
+                  ) : (
+                    <>
+                      {n.status === "open" && (
+                        <CollabButton project={project} skillId={n.skill.id} label="Offer" className="w-full sm:w-auto" />
+                      )}
+                      {onTeam && n.status === "open" && (
+                        <button
+                          onClick={() => submitWork(n)}
+                          disabled={actingWork === n.id}
+                          className={cn(btn.primary, "h-8 px-3 text-xs")}
+                        >
+                          {actingWork === n.id && <Loader2 className="size-3.5 animate-spin mr-1" />}
+                          Submit Work
+                        </button>
+                      )}
+                      {n.status === "claimed" && (
+                        <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200">
+                          Awaiting Approval
+                        </span>
+                      )}
+                    </>
+                  )}
                 </div>
               </li>
             );
@@ -848,7 +1014,7 @@ function EditNeedDialog({
 }) {
   const [note, setNote] = useState(need.note ?? "");
   const [bounty, setBounty] = useState(need.bounty_tolken ? String(need.bounty_tolken) : "");
-  const [status, setStatus] = useState<"open" | "filled">(need.status);
+  const [status, setStatus] = useState<"open" | "claimed" | "filled">(need.status);
   const [saving, setSaving] = useState(false);
 
   async function submit(e: React.FormEvent) {

@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { Check, ChevronLeft, X } from "lucide-react";
+import { Award, Bell, Check, ChevronLeft, Loader2, MessageSquare, Star, UserPlus, X } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Avatar } from "@/components/Avatar";
 import { EmptyState, ErrorState, RowsSkeleton } from "@/components/checks/States";
 import { api } from "@/lib/api";
-import type { CollabOut, ConversationOut, Cycle, InboxItem, ProfileLite } from "@/lib/api-types";
+import type { CollabOut, ConversationOut, Cycle, InboxItem, NotificationItem, ProfileLite } from "@/lib/api-types";
 import { useSession } from "@/lib/session";
 import { btn } from "@/lib/styles";
 import { invalidate, useApi } from "@/lib/use-api";
@@ -17,7 +18,7 @@ import { ago, describe, displayName, joinNames } from "./format";
 import { ConversationRow, MessageThread } from "./Messages";
 import { RingInviteCard } from "./RingInviteCard";
 
-type Filter = "requests" | "sent" | "messages";
+type Filter = "requests" | "sent" | "activity" | "messages";
 
 const kindLabel = { collab: "Join request", swap: "Swap", ring: "Ring" } as const;
 
@@ -36,6 +37,41 @@ function Faces({ people, size }: { people: ProfileLite[]; size: number }) {
   );
 }
 
+function NotificationRow({ item }: { item: NotificationItem }) {
+  const icon =
+    item.kind === "star" ? (
+      <Star className="size-4 text-amber-500 fill-amber-500 shrink-0" />
+    ) : item.kind === "comment" ? (
+      <MessageSquare className="size-4 text-sky-500 shrink-0" />
+    ) : item.kind === "follow" ? (
+      <UserPlus className="size-4 text-purple-500 shrink-0" />
+    ) : item.kind === "bounty" ? (
+      <Award className="size-4 text-teal shrink-0" />
+    ) : (
+      <Bell className="size-4 text-ink shrink-0" />
+    );
+
+  return (
+    <li>
+      <Link
+        href={item.link}
+        className="flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-sunken border-b border-line/60"
+      >
+        <Avatar person={item.actor} size={36} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 text-xs text-muted-ink">
+            {icon}
+            <span className="font-semibold text-ink">@{item.actor.handle}</span>
+            <span>·</span>
+            <span>{ago(item.created_at)}</span>
+          </div>
+          <p className="mt-1 text-sm text-ink leading-snug">{item.message}</p>
+        </div>
+      </Link>
+    </li>
+  );
+}
+
 function FilterToggle({
   value,
   onChange,
@@ -45,24 +81,30 @@ function FilterToggle({
   onChange: (f: Filter) => void;
   unread: number;
 }) {
+  const filters: { id: Filter; label: string }[] = [
+    { id: "requests", label: "Requests" },
+    { id: "sent", label: "Sent" },
+    { id: "activity", label: "Alerts" },
+    { id: "messages", label: "Messages" },
+  ];
   return (
-    <div className="flex w-full rounded-lg border border-line p-0.5 sm:w-auto" role="group" aria-label="Show">
-      {(["requests", "sent", "messages"] as const).map((f) => (
+    <div className="flex w-full rounded-lg border border-line p-0.5 sm:w-auto overflow-x-auto" role="group" aria-label="Show">
+      {filters.map(({ id, label }) => (
         <button
-          key={f}
-          aria-pressed={value === f}
-          onClick={() => onChange(f)}
+          key={id}
+          aria-pressed={value === id}
+          onClick={() => onChange(id)}
           className={cn(
-            "flex h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md px-3 text-sm font-semibold capitalize transition-colors sm:flex-none sm:px-3.5",
-            value === f ? "bg-ink text-white" : "text-muted-ink hover:bg-sunken hover:text-ink",
+            "flex h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md px-3 text-xs sm:text-sm font-semibold transition-colors sm:flex-none sm:px-3",
+            value === id ? "bg-ink text-white" : "text-muted-ink hover:bg-sunken hover:text-ink",
           )}
         >
-          {f}
-          {f === "messages" && unread > 0 && (
+          {label}
+          {id === "messages" && unread > 0 && (
             <span
               className={cn(
                 "flex min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold",
-                value === f ? "bg-white text-ink" : "bg-teal text-white",
+                value === id ? "bg-white text-ink" : "bg-teal text-white",
               )}
             >
               {unread}
@@ -196,11 +238,13 @@ function CycleSuggestions({
   items,
   meId,
   onInvited,
+  onProposeCustom,
 }: {
   cycles: Cycle[];
   items: InboxItem[];
   meId: string;
   onInvited: (item: InboxItem) => void;
+  onProposeCustom?: () => void;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const key = (ids: string[]) => [...ids].sort().join(",");
@@ -208,7 +252,25 @@ function CycleSuggestions({
     items.filter((i) => i.kind !== "collab" && i.status !== "declined").map((i) => `${i.kind}:${key(Object.keys(i.responses))}`),
   );
   const open = cycles.filter((c) => !started.has(`${c.kind}:${key(c.members.map((m) => m.id))}`));
-  if (open.length === 0) return null;
+  if (open.length === 0) {
+    return (
+      <section aria-labelledby="start-title" className="border-t border-line px-5 py-4">
+        <div className="flex items-center justify-between gap-2">
+          <h2 id="start-title" className="text-[13px] font-semibold text-muted-ink">
+            Skill Swaps
+          </h2>
+          <button
+            type="button"
+            onClick={onProposeCustom}
+            className="text-xs font-semibold text-teal hover:underline"
+          >
+            + Propose custom swap
+          </button>
+        </div>
+        <p className="mt-1 text-xs text-muted-ink">Trade skills with another creator with 0 Tolken spent.</p>
+      </section>
+    );
+  }
 
   async function invite(c: Cycle) {
     setBusy(c.id);
@@ -225,9 +287,18 @@ function CycleSuggestions({
 
   return (
     <section aria-labelledby="start-title" className="border-t border-line px-5 py-4">
-      <h2 id="start-title" className="text-[13px] font-semibold text-muted-ink">
-        Swaps and rings you can start
-      </h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 id="start-title" className="text-[13px] font-semibold text-muted-ink">
+          Swaps and rings
+        </h2>
+        <button
+          type="button"
+          onClick={onProposeCustom}
+          className="text-xs font-semibold text-teal hover:underline"
+        >
+          + Custom swap
+        </button>
+      </div>
       <ul className="mt-2 flex flex-col">
         {open.slice(0, 5).map((c) => {
           const others = c.members.filter((m) => m.id !== meId);
@@ -253,6 +324,101 @@ function CycleSuggestions({
 }
 
 /** Requests in one place: join requests, swap invites, and ring invites. List and detail on desktop; one at a time on mobile. */
+
+function CustomSwapDialog({
+  open,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: (item: InboxItem) => void;
+}) {
+  const [partnerHandle, setPartnerHandle] = useState("");
+  const [myProjectId, setMyProjectId] = useState("");
+  const [theirProjectId, setTheirProjectId] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!partnerHandle.trim() || !myProjectId.trim() || !theirProjectId.trim()) return;
+    setSubmitting(true);
+    try {
+      // Find partner profile by handle
+      const partner = await api<{ profile: ProfileLite }>(`/profiles/${partnerHandle.trim().replace(/^@/, "")}`);
+      const item = await api<InboxItem>("/cycles/custom-swap", {
+        method: "POST",
+        body: {
+          partner_id: partner.profile.id,
+          my_project_id: myProjectId.trim(),
+          my_skill_id: 1,
+          their_project_id: theirProjectId.trim(),
+          their_skill_id: 1,
+        },
+      });
+      toast.success("Swap proposal sent! Partner notified in their inbox.");
+      onCreated(item);
+      onClose();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogTitle>Propose a skill swap</DialogTitle>
+        <DialogDescription>
+          Agree to help each other&apos;s project with 0 Tolken exchanged. When both accept, you both join each other&apos;s team.
+        </DialogDescription>
+        <form onSubmit={submit} className="mt-4 flex flex-col gap-3.5">
+          <div>
+            <label className="block text-xs font-semibold mb-1">Partner Handle</label>
+            <input
+              value={partnerHandle}
+              onChange={(e) => setPartnerHandle(e.target.value)}
+              placeholder="e.g. alex or sarah"
+              className="h-10 w-full rounded-lg border border-line px-3 text-sm outline-none focus:border-ink"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1">Your Project ID / Slug</label>
+            <input
+              value={myProjectId}
+              onChange={(e) => setMyProjectId(e.target.value)}
+              placeholder="Your project ID that needs their help"
+              className="h-10 w-full rounded-lg border border-line px-3 text-sm outline-none focus:border-ink"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1">Their Project ID / Slug</label>
+            <input
+              value={theirProjectId}
+              onChange={(e) => setTheirProjectId(e.target.value)}
+              placeholder="Their project ID you want to help"
+              className="h-10 w-full rounded-lg border border-line px-3 text-sm outline-none focus:border-ink"
+              required
+            />
+          </div>
+          <div className="flex justify-end gap-2 border-t border-line pt-3 mt-1">
+            <button type="button" onClick={onClose} className={btn.secondary}>
+              Cancel
+            </button>
+            <button type="submit" disabled={submitting} className={btn.primary}>
+              {submitting && <Loader2 className="size-4 animate-spin mr-1.5" />}
+              Send swap proposal
+            </button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function InboxView() {
   const router = useRouter();
   const pathname = usePathname();
@@ -261,6 +427,8 @@ export function InboxView() {
   const inbox = useApi<InboxItem[]>(signedIn ? "/me/inbox" : null);
   const cycles = useApi<Cycle[]>(signedIn ? "/me/cycles" : null);
   const conversations = useApi<ConversationOut[]>(signedIn ? "/me/conversations" : null);
+  const notifications = useApi<NotificationItem[]>(signedIn ? "/me/notifications" : null);
+  const [proposingSwap, setProposingSwap] = useState(false);
   const [filter, setFilter] = useState<Filter>("requests");
   const [busy, setBusy] = useState(false);
   const selectedId = params.get("thread");
@@ -355,7 +523,19 @@ export function InboxView() {
   ) : null;
 
   return (
-    <div className="lg:grid lg:h-dvh lg:grid-cols-[380px_minmax(0,1fr)] lg:overflow-hidden">
+    <>
+      {proposingSwap && (
+        <CustomSwapDialog
+          open={proposingSwap}
+          onClose={() => setProposingSwap(false)}
+          onCreated={(item) => {
+            inbox.mutate((prev) => [item, ...(prev ?? [])]);
+            setFilter("sent");
+            select(item.id);
+          }}
+        />
+      )}
+      <div className="lg:grid lg:h-dvh lg:grid-cols-[380px_minmax(0,1fr)] lg:overflow-hidden">
       <aside
         className={cn(
           "border-line lg:border-r lg:flex lg:flex-col lg:h-dvh lg:min-h-0 lg:overflow-hidden bg-white",
@@ -378,7 +558,25 @@ export function InboxView() {
         </header>
 
         <div className="flex-1 min-h-0 overflow-y-auto">
-          {filter === "messages" ? (
+          {filter === "activity" ? (
+            notifications.error ? (
+              <ErrorState error={notifications.error} onRetry={notifications.reload} />
+            ) : !notifications.data ? (
+              <RowsSkeleton rows={4} className="px-5 py-3" />
+            ) : notifications.data.length === 0 ? (
+              <EmptyState
+                title="No activity yet"
+                body="When people star, comment, follow you, or release bounties, you'll be pinged here."
+                className="py-16"
+              />
+            ) : (
+              <ul>
+                {notifications.data.map((n) => (
+                  <NotificationRow key={n.id} item={n} />
+                ))}
+              </ul>
+            )
+          ) : filter === "messages" ? (
             conversations.error ? (
               <ErrorState error={conversations.error} onRetry={conversations.reload} />
             ) : !conversations.data ? (
@@ -440,6 +638,7 @@ export function InboxView() {
                 setFilter("sent");
                 select(item.id);
               }}
+              onProposeCustom={() => setProposingSwap(true)}
             />
           )}
         </div>
@@ -474,5 +673,6 @@ export function InboxView() {
         )}
       </section>
     </div>
+    </>
   );
 }

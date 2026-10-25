@@ -137,3 +137,33 @@ def nudge(profile_id: str, user: dict = Depends(get_current_user)):
     text = f"Hey — did you see my invite{' for ' + title if title else ''}? No rush, just want to make sure it reached you."
     return _out(_insert(from_profile_id=me, to_profile_id=profile_id, project_id=last.get("project_id"),
                         kind="nudge", body=text), me)
+
+@router.post("/messages/{message_id}/accept-invite")
+def accept_invite(message_id: str, user: dict = Depends(get_current_user)):
+    me = user["id"]
+    t = service_client().table
+    rows = t("messages").select("*").eq("id", message_id).execute().data
+    if not rows:
+        raise HTTPException(404, "Invite message not found")
+    msg = rows[0]
+    if msg["to_profile_id"] != me:
+        raise HTTPException(403, "This invite is not addressed to you")
+    if msg["kind"] != "invite" or not msg.get("project_id"):
+        raise HTTPException(400, "This message is not a project invite")
+
+    project_id = msg["project_id"]
+    member = t("project_members").select("*").eq("project_id", project_id).eq("profile_id", me).execute().data
+    if not member:
+        t("project_members").insert({
+            "project_id": project_id, "profile_id": me, "role": "contributor", "status": "joined"
+        }).execute()
+    else:
+        t("project_members").update({"status": "joined"}).eq("project_id", project_id).eq("profile_id", me).execute()
+
+    w = world()
+    p_title = w.projects.get(project_id, {}).get("title") or "the project"
+    reply_body = f"I've accepted the invite to {p_title}! Excited to build together."
+    _insert(from_profile_id=me, to_profile_id=msg["from_profile_id"], project_id=project_id,
+            kind="text", body=reply_body)
+    return {"status": "joined", "project_id": project_id, "project_title": p_title}
+

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ..db import parallel, service_client
 from ..deps import get_current_user
-from ..models import CycleInviteIn, InboxItem, InviteRespondIn
+from ..models import CycleInviteIn, CustomSwapIn, InboxItem, InviteRespondIn
 from ..services.cards import profile_lite
 from ..services.graph import link_json
 from ..world import world
@@ -103,3 +103,51 @@ def respond(invite_id: str, body: InviteRespondIn, user: dict = Depends(get_curr
             if new:
                 t("project_members").insert(new).execute()
     return _invite_items(user["id"], invite_id)[0]
+
+@router.post("/cycles/custom-swap", response_model=InboxItem, response_model_by_alias=True, status_code=201)
+def custom_swap(body: CustomSwapIn, user: dict = Depends(get_current_user)):
+    me = user["id"]
+    if body.partner_id == me:
+        raise HTTPException(422, "Cannot swap with yourself")
+    t = service_client().table
+    w = world()
+
+    my_proj = t("projects").select("id,owner_id,title").eq("id", body.my_project_id).execute().data
+    their_proj = t("projects").select("id,owner_id,title").eq("id", body.their_project_id).execute().data
+    if not my_proj or my_proj[0]["owner_id"] != me:
+        raise HTTPException(403, "You do not own your specified project")
+    if not their_proj or their_proj[0]["owner_id"] != body.partner_id:
+        raise HTTPException(422, "Partner does not own the target project")
+
+    links = [
+        {
+            "from": me,
+            "to": body.partner_id,
+            "project_id": body.their_project_id,
+            "skill_id": body.my_skill_id,
+            "project_title": their_proj[0]["title"],
+            "skill_name": w.skills.get(body.my_skill_id, {}).get("name", "Skill"),
+        },
+        {
+            "from": body.partner_id,
+            "to": me,
+            "project_id": body.my_project_id,
+            "skill_id": body.their_skill_id,
+            "project_title": my_proj[0]["title"],
+            "skill_name": w.skills.get(body.their_skill_id, {}).get("name", "Skill"),
+        },
+    ]
+
+    inv = t("cycle_invites").insert({
+        "created_by": me,
+        "kind": "swap",
+        "links": links,
+    }).execute().data[0]
+
+    t("cycle_invite_members").insert([
+        {"invite_id": inv["id"], "profile_id": me, "response": "accepted"},
+        {"invite_id": inv["id"], "profile_id": body.partner_id, "response": "pending"},
+    ]).execute()
+
+    return _invite_items(me, inv["id"])[0]
+

@@ -249,6 +249,7 @@ function NameBio({ profile, onSaved }: { profile: ProfileOut; onSaved: (me: MeOu
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(profile.profile.display_name ?? "");
   const [bio, setBio] = useState(profile.bio ?? "");
+  const [avatarUrl, setAvatarUrl] = useState(profile.profile.avatar_url ?? "");
   const [saving, setSaving] = useState(false);
 
   async function save(e: React.FormEvent) {
@@ -256,7 +257,7 @@ function NameBio({ profile, onSaved }: { profile: ProfileOut; onSaved: (me: MeOu
     if (!name.trim()) return;
     setSaving(true);
     try {
-      const me = await api<MeOut>("/me", { method: "PATCH", body: { display_name: name.trim(), bio: bio.trim() } });
+      const me = await api<MeOut>("/me", { method: "PATCH", body: { display_name: name.trim(), bio: bio.trim(), avatar_url: avatarUrl.trim() || null } });
       onSaved(me);
       await refreshMe();
       invalidate("/feed");
@@ -295,6 +296,27 @@ function NameBio({ profile, onSaved }: { profile: ProfileOut; onSaved: (me: MeOu
 
   return (
     <form onSubmit={save} className="flex max-w-lg flex-col gap-2">
+      <div>
+        <label htmlFor="avatar-url" className="mb-1 block text-xs font-semibold text-muted-ink">
+          Profile Picture URL
+        </label>
+        <div className="flex items-center gap-3">
+          {avatarUrl.trim() ? (
+            <img src={avatarUrl.trim()} alt="Avatar preview" className="size-10 rounded-full object-cover border border-line" />
+          ) : (
+            <div className="size-10 rounded-full bg-sunken flex items-center justify-center text-xs font-bold text-muted-ink border border-line">
+              {(name || profile.profile.handle).slice(0, 2).toUpperCase()}
+            </div>
+          )}
+          <input
+            id="avatar-url"
+            value={avatarUrl}
+            onChange={(e) => setAvatarUrl(e.target.value)}
+            placeholder="https://example.com/avatar.jpg"
+            className="h-10 flex-1 rounded-lg border border-line px-3 text-sm outline-none focus:border-ink"
+          />
+        </div>
+      </div>
       <label htmlFor="name" className="sr-only">
         Name
       </label>
@@ -303,6 +325,7 @@ function NameBio({ profile, onSaved }: { profile: ProfileOut; onSaved: (me: MeOu
         value={name}
         maxLength={60}
         onChange={(e) => setName(e.target.value)}
+        placeholder="Display name"
         className="h-11 rounded-lg border border-line px-3 text-lg font-bold outline-none focus:border-ink"
       />
       <label htmlFor="bio" className="sr-only">

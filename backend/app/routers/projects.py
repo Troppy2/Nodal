@@ -188,3 +188,46 @@ def delete_need(project_id: str, need_id: str, user: dict = Depends(get_current_
             pass
     sb.table("project_needs").delete().eq("id", need_id).eq("project_id", project_id).execute()
     return fresh_detail(project_id, user["id"])
+
+@router.post("/projects/{project_id}/needs/{need_id}/submit-work", response_model=ProjectDetail)
+def submit_work(project_id: str, need_id: str, user: dict = Depends(get_current_user)):
+    me = user["id"]
+    sb = service_client()
+    needs = sb.table("project_needs").select("*").eq("id", need_id).eq("project_id", project_id).execute().data
+    if not needs:
+        raise HTTPException(404, "Need not found")
+
+    sb.table("project_needs").update({"status": "claimed"}).eq("id", need_id).execute()
+
+    ledger = sb.table("tolken_ledger").select("*").eq("need_id", need_id).in_("status", ["pending_funding", "funded"]).execute().data
+    for entry in ledger:
+        if not entry.get("contributor_id"):
+            sb.table("tolken_ledger").update({"contributor_id": me}).eq("id", entry["id"]).execute()
+
+    return fresh_detail(project_id, user["id"])
+
+
+@router.post("/projects/{project_id}/needs/{need_id}/confirm-work", response_model=ProjectDetail)
+def confirm_work(project_id: str, need_id: str, user: dict = Depends(get_current_user)):
+    require_owner(project_id, user)
+    sb = service_client()
+    needs = sb.table("project_needs").select("*").eq("id", need_id).eq("project_id", project_id).execute().data
+    if not needs:
+        raise HTTPException(404, "Need not found")
+
+    sb.table("project_needs").update({"status": "filled"}).eq("id", need_id).execute()
+
+    from ..services import tolken_service
+    ledger = sb.table("tolken_ledger").select("*").eq("need_id", need_id).in_("status", ["funded", "pending_funding"]).execute().data
+    for entry in ledger:
+        try:
+            if entry["status"] == "pending_funding":
+                funded_entry = tolken_service.fund(entry)
+                tolken_service.release(funded_entry)
+            elif entry["status"] == "funded":
+                tolken_service.release(entry)
+        except Exception:
+            pass
+
+    return fresh_detail(project_id, user["id"])
+

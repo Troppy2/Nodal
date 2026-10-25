@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowUpRight, ChevronLeft, Loader2, Send } from "lucide-react";
+import { ArrowUpRight, Check, ChevronLeft, Loader2, Rocket, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar } from "@/components/Avatar";
 import { EmptyState, ErrorState, RowsSkeleton } from "@/components/checks/States";
@@ -62,8 +62,30 @@ export function ConversationRow({
   );
 }
 
-function Bubble({ message }: { message: MessageOut }) {
+function Bubble({
+  message,
+  project,
+  onAcceptInvite,
+}: {
+  message: MessageOut;
+  project?: { id: string; title: string } | null;
+  onAcceptInvite?: (messageId: string) => Promise<void>;
+}) {
   const invite = message.kind !== "text";
+  const [accepting, setAccepting] = useState(false);
+  const [accepted, setAccepted] = useState(false);
+
+  async function handleAccept() {
+    if (!onAcceptInvite || accepting) return;
+    setAccepting(true);
+    try {
+      await onAcceptInvite(message.id);
+      setAccepted(true);
+    } finally {
+      setAccepting(false);
+    }
+  }
+
   return (
     <li className={cn("flex", message.mine ? "justify-end" : "justify-start")}>
       <div
@@ -75,6 +97,33 @@ function Bubble({ message }: { message: MessageOut }) {
       >
         {invite && <Label className="mb-1 text-teal">{kindLabel[message.kind]}</Label>}
         <p className="whitespace-pre-wrap">{message.body}</p>
+
+        {message.kind === "invite" && !message.mine && project && (
+          <div className="mt-3 pt-3 border-t border-teal/20 flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-ink truncate">{project.title}</span>
+              <Link href={`/projects/${project.id}`} className="text-xs font-semibold text-teal hover:underline shrink-0">
+                View project
+              </Link>
+            </div>
+            {accepted ? (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal">
+                <Check className="size-3.5" /> Joined team!
+              </span>
+            ) : (
+              <button
+                type="button"
+                disabled={accepting}
+                onClick={handleAccept}
+                className={cn(btn.match, "h-8 px-3 text-xs w-full justify-center")}
+              >
+                {accepting ? <Loader2 className="size-3.5 animate-spin mr-1" /> : <Rocket className="size-3.5 mr-1" />}
+                Accept Invite & Start Working
+              </button>
+            )}
+          </div>
+        )}
+
         <p className={cn("mt-1 text-[11px] text-muted-ink", message.mine && "text-right")}>{ago(message.created_at)}</p>
       </div>
     </li>
@@ -144,6 +193,20 @@ export function MessageThread({
       toast.error((e as Error).message);
     } finally {
       setNudging(false);
+    }
+  }
+
+  async function handleAcceptInvite(messageId: string) {
+    try {
+      const res = await api<{ status: string; project_id: string; project_title: string }>(
+        `/messages/${messageId}/accept-invite`,
+        { method: "POST" }
+      );
+      toast.success(`Joined ${res.project_title}! You're now on the team.`);
+      thread.reload();
+      invalidate("/me/conversations", `/projects/${res.project_id}`, "/me");
+    } catch (e) {
+      toast.error((e as Error).message);
     }
   }
 
@@ -254,7 +317,7 @@ export function MessageThread({
           ) : (
             <ul className="flex flex-col gap-2.5 py-2">
               {messages.map((m) => (
-                <Bubble key={m.id} message={m} />
+                <Bubble key={m.id} message={m} project={project} onAcceptInvite={handleAcceptInvite} />
               ))}
               <div ref={messagesEndRef} />
             </ul>

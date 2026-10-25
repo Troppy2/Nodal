@@ -59,7 +59,7 @@ class NeedOut(BaseModel):
     skill: Skill
     note: str | None = None
     bounty_tolken: int | None = None
-    status: Literal["open", "filled"]
+    status: Literal["open", "claimed", "filled"]
     fitters: list[ProfileLite] = []      # people who offer this skill, owner excluded, viewer first
     viewer_fits: bool = False
     viewer_requested: bool = False
@@ -141,7 +141,7 @@ class ProjectPatch(BaseModel):
 class NeedPatch(BaseModel):
     note: str | None = None
     bounty_tolken: int | None = Field(default=None, gt=0)
-    status: Literal["open", "filled"] | None = None
+    status: Literal["open", "claimed", "filled"] | None = None
 
 
 # ---------- comments and collab requests ----------
@@ -334,6 +334,15 @@ class InboxItem(BaseModel):
     status: Literal["pending", "accepted", "declined"]
     actions: list[Literal["accept", "decline"]] = []
 
+
+
+class CustomSwapIn(BaseModel):
+    partner_id: str
+    my_project_id: str
+    my_skill_id: int
+    their_project_id: str
+    their_skill_id: int
+    message: str | None = None
 
 class CycleInviteIn(BaseModel):
     cycle_id: str                        # an id from GET /me/cycles
