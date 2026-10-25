@@ -20,7 +20,7 @@ import { ImageUploader } from "./ImageUploader";
 
 const types: ProjectType[] = ["software", "hardware", "creative"];
 const input =
-  "w-full rounded-lg border bg-white px-3 text-[15px] text-ink outline-none placeholder:text-muted-ink hover:border-ink/30 focus:border-ink";
+  "w-full rounded-lg border bg-white px-3 text-[15px] text-ink outline-none placeholder:text-muted-ink hover:border-ink/30 focus:border-ink [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden";
 
 interface NeedDraft {
   skill: Skill;

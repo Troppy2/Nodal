@@ -51,7 +51,7 @@ export function SkillPicker({ exclude, onAdd, invalid }: { exclude: number[]; on
             aria-label="Search skills"
             className="h-10 w-full rounded-t-lg border-b border-line px-3 text-sm outline-none focus-visible:border-ink"
           />
-          <ul className="max-h-56 overflow-y-auto p-1">
+          <ul className="max-h-56 overflow-y-auto p-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             {skills.error ? (
               <li className="px-2.5 py-2 text-sm text-muted-ink">
                 Couldn&apos;t load skills.{" "}

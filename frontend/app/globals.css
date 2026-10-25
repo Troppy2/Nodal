@@ -193,10 +193,14 @@ select:focus-visible {
   }
 }
 
-/* Hide scroll bars on tabs, filter strips, and horizontally scrollable navigation across all browsers */
+/* Hide scroll bars on dialogs, modals, popups, tabs, filter strips, textareas, and edit surfaces across all browsers */
 [role="tablist"],
 [role="radiogroup"],
 [role="group"],
+[role="dialog"],
+[data-slot="dialog-content"],
+dialog,
+textarea,
 .no-scrollbar,
 [data-no-scrollbar] {
   scrollbar-width: none !important;
@@ -205,6 +209,10 @@ select:focus-visible {
 [role="tablist"]::-webkit-scrollbar,
 [role="radiogroup"]::-webkit-scrollbar,
 [role="group"]::-webkit-scrollbar,
+[role="dialog"]::-webkit-scrollbar,
+[data-slot="dialog-content"]::-webkit-scrollbar,
+dialog::-webkit-scrollbar,
+textarea::-webkit-scrollbar,
 .no-scrollbar::-webkit-scrollbar,
 [data-no-scrollbar]::-webkit-scrollbar {
   display: none !important;

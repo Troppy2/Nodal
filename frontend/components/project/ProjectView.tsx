@@ -382,7 +382,7 @@ function EditProjectDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:max-w-xl">
         <DialogTitle>Edit {project.stage === "idea" ? "Idea" : "Project"}</DialogTitle>
         <DialogDescription>Update details, stage, links, and cover picture.</DialogDescription>
         <form onSubmit={submit} className="mt-4 flex flex-col gap-4">
@@ -430,7 +430,7 @@ function EditProjectDialog({
               rows={2}
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
-              className={cn(inputClass, "py-2")}
+              className={cn(inputClass, "py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden")}
               required
               maxLength={600}
             />
@@ -452,7 +452,7 @@ function EditProjectDialog({
               rows={5}
               value={readme}
               onChange={(e) => setReadme(e.target.value)}
-              className={cn(inputClass, "font-mono py-2 text-xs")}
+              className={cn(inputClass, "font-mono py-2 text-xs [scrollbar-width:none] [&::-webkit-scrollbar]:hidden")}
               placeholder="## What this project is about..."
             />
           </div>
