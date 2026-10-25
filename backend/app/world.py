@@ -19,7 +19,13 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property
 
+import logging
+
+from postgrest.exceptions import APIError
+
 from .db import parallel, select_all, service_client
+
+log = logging.getLogger("nodal")
 
 MAX_AGE_S = 20
 PROFILE_COLS = "id,handle,display_name,avatar_url,bio,interests,created_at"
@@ -124,6 +130,21 @@ class World:
                      and (r["is_public"] or r["requested_by"] == viewer_id)), None)
 
 
+NEED_COLS = "id,project_id,skill_id,note,bounty_tolken,status"
+
+
+def _needs(t) -> list[dict]:
+    """Needs with who submitted and completed them. Falls back to the base columns when the
+    20261025000000_need_completion migration has not been applied, so the app keeps working."""
+    try:
+        return select_all(t("project_needs").select(NEED_COLS + ",submitted_by,completed_by").order("id"))
+    except APIError as e:
+        if e.code != "42703":
+            raise
+        log.warning("project_needs completion columns missing; apply migration 20261025000000_need_completion.sql")
+        return select_all(t("project_needs").select(NEED_COLS).order("id"))
+
+
 def _load() -> World:
     sb = service_client()
     t = sb.table
@@ -132,7 +153,7 @@ def _load() -> World:
         lambda: select_all(t("skills").select("*").order("id")),
         lambda: select_all(t("profiles").select(PROFILE_COLS).order("id")),
         lambda: select_all(t("projects").select(PROJECT_COLS).order("id")),
-        lambda: select_all(t("project_needs").select("id,project_id,skill_id,note,bounty_tolken,status,submitted_by,completed_by").order("id")),
+        lambda: _needs(t),
         lambda: select_all(t("profile_offers").select("profile_id,skill_id,level").eq("available", True)
                            .order("profile_id").order("skill_id")),
         lambda: select_all(t("project_tags").select("project_id,tag").order("project_id").order("tag")),
