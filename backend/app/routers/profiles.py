@@ -2,6 +2,7 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from postgrest.exceptions import APIError
 
 from ..db import service_client
 from ..deps import get_optional_user
@@ -55,7 +56,12 @@ def activity(handle: str, weeks: int = Query(52, ge=1, le=53)):
     (with or without a Tolken bounty)."""
     pid = _profile_id(world(), handle)
     since = (datetime.now(timezone.utc) - timedelta(weeks=weeks)).isoformat()
-    rows = (service_client().table("project_needs").select("completed_at")
-            .eq("completed_by", pid).gte("completed_at", since).execute().data)
+    try:
+        rows = (service_client().table("project_needs").select("completed_at")
+                .eq("completed_by", pid).gte("completed_at", since).execute().data)
+    except APIError as e:      # completion migration not applied yet: nothing recorded
+        if e.code != "42703":
+            raise
+        rows = []
     days = Counter(r["completed_at"][:10] for r in rows)
     return [{"date": d, "count": c} for d, c in sorted(days.items())]

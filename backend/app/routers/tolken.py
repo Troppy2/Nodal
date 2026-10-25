@@ -6,7 +6,7 @@ from ..models import LedgerEntry, TolkenOut
 from ..services import tolken_service
 from ..services.cards import profile_lite
 from ..world import invalidate, world
-from .projects import completion
+from .projects import completion, update_need
 
 router = APIRouter()
 
@@ -87,8 +87,7 @@ def release(entry_id: str, user: dict = Depends(get_current_user)):
     entry = tolken_service.release(_owned_entry(entry_id, user["id"]))
     if entry.get("contributor_id"):
         # a paid bounty is finished work: close the need and credit the contributor
-        service_client().table("project_needs").update(completion(entry["contributor_id"])) \
-            .eq("id", entry["need_id"]).eq("status", "open").execute()
+        update_need(entry["need_id"], completion(entry["contributor_id"]), only_open=True)
         invalidate()
     return _entries([entry])[0]
 

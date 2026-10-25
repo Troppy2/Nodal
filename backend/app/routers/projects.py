@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from postgrest.exceptions import APIError
 
 from ..db import service_client, user_client
 from ..deps import get_current_user, get_optional_user
@@ -176,10 +177,10 @@ def patch_need(project_id: str, need_id: str, body: NeedPatch, user: dict = Depe
         need = need_row(project_id, need_id)
         if changes.get("status") == "filled" and need["status"] == "open":
             # marking filled credits whoever submitted work; with no submission nobody is credited
-            changes.update(completion(need["submitted_by"]))
+            changes.update(completion(need.get("submitted_by")))
         elif changes.get("status") == "open":
             changes.update({"completed_by": None, "completed_at": None, "submitted_by": None})
-        service_client().table("project_needs").update(changes).eq("id", need_id).eq("project_id", project_id).execute()
+        update_need(need_id, changes)
     return fresh_detail(project_id, user["id"])
 
 
@@ -202,6 +203,24 @@ def need_row(project_id: str, need_id: str) -> dict:
     if not rows:
         raise HTTPException(404, "Need not found")
     return rows[0]
+
+
+COMPLETION_COLS = ("submitted_by", "completed_by", "completed_at")
+
+
+def update_need(need_id: str, changes: dict, only_open: bool = False) -> None:
+    """Update a need. Without the 20261025000000_need_completion migration the completion columns
+    don't exist yet, so retry without them instead of failing the request."""
+    def run(c: dict) -> None:
+        if c:
+            q = service_client().table("project_needs").update(c).eq("id", need_id)
+            (q.eq("status", "open") if only_open else q).execute()
+    try:
+        run(changes)
+    except APIError as e:
+        if e.code not in ("PGRST204", "42703"):
+            raise
+        run({k: v for k, v in changes.items() if k not in COMPLETION_COLS})
 
 
 def completion(profile_id: str | None) -> dict:
@@ -228,7 +247,7 @@ def submit_work(project_id: str, need_id: str, user: dict = Depends(get_current_
     if need.get("submitted_by") and need["submitted_by"] != me:
         raise HTTPException(409, "Someone else already submitted work for this need")
 
-    sb.table("project_needs").update({"submitted_by": me}).eq("id", need_id).execute()
+    update_need(need_id, {"submitted_by": me})
     sb.table("tolken_ledger").update({"contributor_id": me}).eq("need_id", need_id) \
         .in_("status", ["pending_funding", "funded"]).is_("contributor_id", "null").execute()
     skill_name = world().skills.get(need["skill_id"], {}).get("name", "skill")
@@ -255,5 +274,5 @@ def confirm_work(project_id: str, need_id: str, user: dict = Depends(get_current
     from ..services import tolken_service
     for entry in ledger:
         tolken_service.release(tolken_service.fund(entry) if entry["status"] == "pending_funding" else entry)
-    sb.table("project_needs").update(completion(contributor)).eq("id", need_id).execute()
+    update_need(need_id, completion(contributor))
     return fresh_detail(project["id"], user["id"])
