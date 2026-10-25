@@ -213,6 +213,9 @@ export interface MessageOut {
   mine: boolean;
   created_at: string;
   read_at: string | null;
+  /** Invites only: the project the invite is for, and whether the invitee joined it. */
+  project?: { id: string; title: string } | null;
+  joined?: boolean;
 }
 
 export interface ConversationOut {

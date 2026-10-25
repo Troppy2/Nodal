@@ -88,14 +88,14 @@ function FilterToggle({
     { id: "messages", label: "Messages" },
   ];
   return (
-    <div className="flex w-full rounded-lg border border-line p-0.5 sm:w-auto overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Show">
+    <div className="flex w-full rounded-lg border border-line p-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Show">
       {filters.map(({ id, label }) => (
         <button
           key={id}
           aria-pressed={value === id}
           onClick={() => onChange(id)}
           className={cn(
-            "flex h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md px-3 text-xs sm:text-sm font-semibold transition-colors sm:flex-none sm:px-3",
+            "flex h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md px-2 text-xs sm:text-sm font-semibold transition-colors",
             value === id ? "bg-ink text-white" : "text-muted-ink hover:bg-sunken hover:text-ink",
           )}
         >
@@ -542,7 +542,7 @@ export function InboxView() {
           hasSelection && "max-lg:hidden",
         )}
       >
-        <header className="shrink-0 flex flex-col gap-3 px-5 pb-3 pt-5 sm:flex-row sm:items-center sm:justify-between border-b border-line bg-white">
+        <header className="shrink-0 flex flex-col gap-3 px-5 pb-3 pt-5 border-b border-line bg-white">
           <h1 className="text-2xl font-extrabold tracking-tight">
             Inbox
             {pendingCount > 0 && <span className="ml-2 text-base font-semibold text-teal">{pendingCount} to answer</span>}

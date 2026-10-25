@@ -64,16 +64,16 @@ export function ConversationRow({
 
 function Bubble({
   message,
-  project,
   onAcceptInvite,
 }: {
   message: MessageOut;
-  project?: { id: string; title: string } | null;
   onAcceptInvite?: (messageId: string) => Promise<void>;
 }) {
   const invite = message.kind !== "text";
+  // Each invite names its own project, so an invite to a deleted project shows no card.
+  const inviteProject = message.project;
   const [accepting, setAccepting] = useState(false);
-  const [accepted, setAccepted] = useState(false);
+  const [accepted, setAccepted] = useState(!!message.joined);
 
   async function handleAccept() {
     if (!onAcceptInvite || accepting) return;
@@ -98,11 +98,11 @@ function Bubble({
         {invite && <Label className="mb-1 text-teal">{kindLabel[message.kind]}</Label>}
         <p className="whitespace-pre-wrap">{message.body}</p>
 
-        {message.kind === "invite" && !message.mine && project && (
+        {message.kind === "invite" && !message.mine && inviteProject && (
           <div className="mt-3 pt-3 border-t border-teal/20 flex flex-col gap-2">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-ink truncate">{project.title}</span>
-              <Link href={`/projects/${project.id}`} className="text-xs font-semibold text-teal hover:underline shrink-0">
+              <span className="text-xs font-semibold text-ink truncate">{inviteProject.title}</span>
+              <Link href={`/projects/${inviteProject.id}`} className="text-xs font-semibold text-teal hover:underline shrink-0">
                 View project
               </Link>
             </div>
@@ -317,7 +317,7 @@ export function MessageThread({
           ) : (
             <ul className="flex flex-col gap-2.5 py-2">
               {messages.map((m) => (
-                <Bubble key={m.id} message={m} project={project} onAcceptInvite={handleAcceptInvite} />
+                <Bubble key={m.id} message={m} onAcceptInvite={handleAcceptInvite} />
               ))}
               <div ref={messagesEndRef} />
             </ul>

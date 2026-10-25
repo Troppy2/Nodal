@@ -32,75 +32,101 @@ export function PeopleGraph({
   const byId = Object.fromEntries(nodes.map((n) => [n.profile.id, n]));
 
   return (
-    <div className="relative mx-auto aspect-square w-full max-w-[420px] sm:aspect-[16/10] sm:max-w-[620px]">
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 size-full" aria-hidden>
-        {nodes.map((n) => (
-          <line
-            key={n.profile.id}
-            x1="50"
-            y1="48"
-            x2={n.x}
-            y2={n.y}
-            stroke={n.kind ? TEAL : GREY}
-            strokeWidth={n.kind ? 2.5 : 1.25}
-            vectorEffect="non-scaling-stroke"
-          />
-        ))}
-        {rings.map((r) => (
-          <line
-            key={`${r.from}-${r.to}`}
-            x1={byId[r.from].x}
-            y1={byId[r.from].y}
-            x2={byId[r.to].x}
-            y2={byId[r.to].y}
-            stroke={TEAL}
-            strokeWidth={2.5}
-            strokeDasharray="6 4"
-            vectorEffect="non-scaling-stroke"
-          />
-        ))}
-      </svg>
+    // Sized by its container, not the viewport: the results page puts the graph in a narrow column.
+    <div className="@container w-full">
+      <div className="relative mx-auto aspect-square w-full max-w-[420px] @xl:aspect-[16/10] @xl:max-w-[620px]">
+        <svg
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          className="absolute inset-0 size-full"
+          aria-hidden
+        >
+          {nodes.map((n) => (
+            <line
+              key={n.profile.id}
+              x1="50"
+              y1="48"
+              x2={n.x}
+              y2={n.y}
+              stroke={n.kind ? TEAL : GREY}
+              strokeWidth={n.kind ? 2.5 : 1.25}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+          {rings.map((r) => (
+            <line
+              key={`${r.from}-${r.to}`}
+              x1={byId[r.from].x}
+              y1={byId[r.from].y}
+              x2={byId[r.to].x}
+              y2={byId[r.to].y}
+              stroke={TEAL}
+              strokeWidth={2.5}
+              strokeDasharray="6 4"
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+        </svg>
 
-      <div
-        className="absolute flex size-[84px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-ink p-3 text-center text-[13px] font-extrabold leading-tight text-white"
-        style={{ left: "50%", top: "48%" }}
-      >
-        <span className="line-clamp-3">{center}</span>
-      </div>
+        <div
+          className="absolute flex size-[84px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-ink p-3 text-center text-[13px] font-extrabold leading-tight text-white"
+          style={{ left: "50%", top: "48%" }}
+        >
+          <span className="line-clamp-3">{center}</span>
+        </div>
 
-      {nodes.map((n) => {
-        const active = selected === n.profile.id;
-        const name = n.profile.id === viewerId ? "You" : firstName(n.profile);
-        return (
-          <button
-            key={n.profile.id}
-            onClick={() => onSelect(n.profile.id)}
-            aria-pressed={active}
-            aria-label={`${n.profile.display_name ?? n.profile.handle}, fills ${n.skills.join(", ")}${n.kind ? `, ${n.kind}` : ""}`}
-            className="group absolute flex -translate-x-1/2 -translate-y-[30%] cursor-pointer flex-col items-center gap-1 rounded-xl p-1"
-            style={{ left: `${n.x}%`, top: `${n.y}%` }}
-          >
-            <span
-              className={cn(
-                "rounded-full p-[3px] transition-shadow",
-                active ? "ring-2 ring-ink" : "ring-2 ring-transparent group-hover:ring-line",
-              )}
+        {nodes.map((n) => {
+          const active = selected === n.profile.id;
+          const name = n.profile.id === viewerId ? "You" : firstName(n.profile);
+          return (
+            <button
+              key={n.profile.id}
+              onClick={() => onSelect(n.profile.id)}
+              aria-pressed={active}
+              aria-label={`${n.profile.display_name ?? n.profile.handle}, fills ${n.skills.join(", ")}${n.kind ? `, ${n.kind}` : ""}`}
+              className="group absolute flex -translate-x-1/2 -translate-y-[30%] cursor-pointer flex-col items-center gap-1 rounded-xl p-1"
+              style={{ left: `${n.x}%`, top: `${n.y}%` }}
             >
-              <span className={cn("block rounded-full border-2", n.kind ? "border-teal" : "border-transparent")}>
-                <Avatar person={n.profile} size={44} />
+              <span
+                className={cn(
+                  "rounded-full p-[3px] transition-shadow",
+                  active
+                    ? "ring-2 ring-ink"
+                    : "ring-2 ring-transparent group-hover:ring-line",
+                )}
+              >
+                <span
+                  className={cn(
+                    "block rounded-full border-2",
+                    n.kind ? "border-teal" : "border-transparent",
+                  )}
+                >
+                  <Avatar person={n.profile} size={44} />
+                </span>
               </span>
-            </span>
-            <span className="flex flex-col items-center bg-white/90 px-1 leading-tight">
-              <span className={cn("text-xs", active ? "font-bold" : "font-semibold")}>{name}</span>
-              <span className="max-w-[140px] truncate text-xs text-muted-ink">
-                {n.skills[0]}
-                {n.skills.length > 1 && ` +${n.skills.length - 1}`}
+              <span className="flex flex-col items-center bg-white/90 px-1 leading-tight">
+                <span
+                  className={cn(
+                    "text-xs",
+                    active ? "font-bold" : "font-semibold",
+                  )}
+                >
+                  {name}
+                </span>
+                <span className="max-w-[140px] truncate text-xs text-muted-ink">
+                  {n.skills[0]}
+                  {n.skills.length > 1 && ` +${n.skills.length - 1}`}
+                </span>
+                {n.kind && (
+                  <span className="text-xs font-medium text-teal">
+                    {n.kind === "swap" ? "Swap" : "Ring"}
+                  </span>
+                )}
               </span>
-              {n.kind && <span className="text-xs font-medium text-teal">{n.kind === "swap" ? "Swap" : "Ring"}</span>}
-            </span>
-          </button>
-        );
-      })}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

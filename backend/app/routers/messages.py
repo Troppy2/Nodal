@@ -34,9 +34,16 @@ def _thread_project(w: World, rows: list[dict]) -> dict | None:
     return project_ref(w, pid) if pid and w.projects[pid]["owner_id"] in w.profiles else None
 
 
-def _out(row: dict, me: str) -> dict:
-    return {"id": row["id"], "body": row["body"], "kind": row["kind"], "mine": row["from_profile_id"] == me,
-            "created_at": row["created_at"], "read_at": row.get("read_at")}
+def _out(row: dict, me: str, w: World | None = None) -> dict:
+    """With the world, an invite also carries its own project and whether its invitee has joined."""
+    out = {"id": row["id"], "body": row["body"], "kind": row["kind"], "mine": row["from_profile_id"] == me,
+           "created_at": row["created_at"], "read_at": row.get("read_at")}
+    pid = row.get("project_id")
+    if w and row["kind"] == "invite" and pid in w.projects:
+        out["project"] = {"id": pid, "title": w.projects[pid]["title"]}
+        out["joined"] = any(m["profile_id"] == row["to_profile_id"] and m["status"] == "joined"
+                            for m in w.members.get(pid, []))
+    return out
 
 
 def _thread_rows(me: str, other: str) -> list[dict]:
@@ -80,7 +87,7 @@ def thread(profile_id: str, user: dict = Depends(get_current_user)):
         service_client().table("messages").update({"read_at": datetime.now(timezone.utc).isoformat()}) \
             .eq("from_profile_id", profile_id).eq("to_profile_id", me).is_("read_at", "null").execute()
     last = rows[-1] if rows else None
-    return {"profile": partner, "project": _thread_project(w, rows), "messages": [_out(r, me) for r in rows],
+    return {"profile": partner, "project": _thread_project(w, rows), "messages": [_out(r, me, w) for r in rows],
             "can_nudge": bool(last and last["from_profile_id"] == me and last["kind"] == "invite")}
 
 

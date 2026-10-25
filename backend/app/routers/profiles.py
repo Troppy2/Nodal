@@ -59,9 +59,10 @@ def activity(handle: str, weeks: int = Query(52, ge=1, le=53)):
     try:
         rows = (service_client().table("project_needs").select("completed_at")
                 .eq("completed_by", pid).gte("completed_at", since).execute().data)
-    except APIError as e:      # completion migration not applied yet: nothing recorded
+    except APIError as e:      # completion migration not applied yet: fall back to paid bounties
         if e.code != "42703":
             raise
-        rows = []
+        rows = [{"completed_at": r["updated_at"]} for r in service_client().table("tolken_ledger").select("updated_at")
+                .eq("contributor_id", pid).eq("status", "released").gte("updated_at", since).execute().data]
     days = Counter(r["completed_at"][:10] for r in rows)
     return [{"date": d, "count": c} for d, c in sorted(days.items())]

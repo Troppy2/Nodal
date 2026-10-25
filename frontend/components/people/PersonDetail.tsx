@@ -38,7 +38,7 @@ export function PersonDetail({
   const chips = [...node.reasons, ...(node.kind === "swap" && !node.reasons.some((r) => /swap/i.test(r)) ? ["Swap"] : []), ...(node.kind === "ring" ? ["Ring"] : [])];
 
   return (
-    <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+    <div className="flex flex-col gap-4">
       <div className="flex min-w-0 flex-1 gap-3">
         <Avatar person={profile} size={44} />
         <div className="min-w-0">
@@ -68,15 +68,15 @@ export function PersonDetail({
         <div className="flex shrink-0 gap-2">
           {isOwner &&
             (invited ? (
-              <span className={cn(btn.done, "max-lg:flex-1")}>
+              <span className={cn(btn.done, "flex-1")}>
                 <Check className="size-4" /> Invited
               </span>
             ) : (
-              <button onClick={() => setInviteOpen(true)} className={cn(btn.match, "max-lg:flex-1")}>
+              <button onClick={() => setInviteOpen(true)} className={cn(btn.match, "flex-1")}>
                 Invite to build
               </button>
             ))}
-          <Link href={`/u/${profile.handle}`} className={cn(btn.secondary, "max-lg:flex-1")}>
+          <Link href={`/u/${profile.handle}`} className={cn(btn.secondary, "flex-1")}>
             View profile
           </Link>
         </div>

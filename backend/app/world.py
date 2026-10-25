@@ -142,7 +142,17 @@ def _needs(t) -> list[dict]:
         if e.code != "42703":
             raise
         log.warning("project_needs completion columns missing; apply migration 20261025000000_need_completion.sql")
-        return select_all(t("project_needs").select(NEED_COLS).order("id"))
+        needs = select_all(t("project_needs").select(NEED_COLS).order("id"))
+        # Bounty needs still record their contributor on the ledger, so recover who submitted
+        # (bounty held) and who finished (bounty paid) from there.
+        ledger = select_all(t("tolken_ledger").select("need_id,contributor_id,status")
+                            .not_.is_("contributor_id", "null").order("created_at"))
+        held = {e["need_id"]: e["contributor_id"] for e in ledger if e["status"] in ("pending_funding", "funded")}
+        paid = {e["need_id"]: e["contributor_id"] for e in ledger if e["status"] == "released"}
+        for n in needs:
+            n["submitted_by"] = held.get(n["id"]) if n["status"] == "open" else None
+            n["completed_by"] = paid.get(n["id"]) if n["status"] == "filled" else None
+        return needs
 
 
 def _load() -> World:

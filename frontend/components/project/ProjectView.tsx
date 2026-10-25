@@ -120,7 +120,13 @@ function Loaded({
   const hasCode = project.has_source;
   const first: ProjectTab = hasCode ? "code" : "readme";
   const valid: ProjectTab[] = [first, "needs", "discussion", "activity"];
-  const [tab, setTab] = useState<ProjectTab>(valid.includes(initialTab as ProjectTab) ? (initialTab as ProjectTab) : first);
+  // The tab lives in the URL too, so a refetch that remounts this view keeps the viewer on it.
+  const fromUrl = useSearchParams().get("tab") ?? initialTab;
+  const [tab, setTabState] = useState<ProjectTab>(valid.includes(fromUrl as ProjectTab) ? (fromUrl as ProjectTab) : first);
+  const setTab = (t: ProjectTab) => {
+    setTabState(t);
+    window.history.replaceState(null, "", `?tab=${t}`);
+  };
   const [busy, setBusy] = useState<"star" | "follow" | "deleting" | "shipping" | null>(null);
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -261,7 +267,13 @@ function Loaded({
                 >
                   {project.viewer_follows_owner ? "Following" : `Follow ${project.owner.handle}`}
                 </button>
-                <CollabButton project={project} className="col-span-2 sm:col-span-1" />
+                {project.members.some((m) => m.profile.id === me?.profile.id && m.status === "joined") ? (
+                  <span className={cn(btn.done, "col-span-2 pointer-events-none sm:col-span-1")}>
+                    <Check className="size-4" /> On the team
+                  </span>
+                ) : (
+                  <CollabButton project={project} className="col-span-2 sm:col-span-1" />
+                )}
               </>
             )}
           </div>
@@ -560,7 +572,7 @@ function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner:
   const [pending, setPending] = useState<{ kind: "confirm" | "delete"; need: NeedOut } | null>(null);
 
   const pendingRequests = collabReqs.data?.filter((r) => r.status === "pending") ?? [];
-  const onTeam = Boolean(me && project.members.some((m) => m.profile.id === me.profile.id));
+  const onTeam = Boolean(me && project.members.some((m) => m.profile.id === me.profile.id && m.status === "joined"));
 
   async function respondRequest(requestId: string, status: "accepted" | "declined") {
     try {
@@ -833,7 +845,7 @@ function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner:
                     </>
                   ) : (
                     <>
-                      {n.status === "open" && (
+                      {n.status === "open" && !onTeam && (
                         <CollabButton project={project} skillId={n.skill.id} label="Offer" className="w-full sm:w-auto" />
                       )}
                       {onTeam && n.status === "open" && !n.submitted_by && (

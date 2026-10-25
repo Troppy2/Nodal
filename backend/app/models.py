@@ -371,6 +371,11 @@ class InviteIn(BaseModel):
     body: str | None = Field(default=None, max_length=1000)
 
 
+class MessageProject(BaseModel):
+    id: str
+    title: str
+
+
 class MessageOut(BaseModel):
     id: str
     body: str
@@ -378,6 +383,9 @@ class MessageOut(BaseModel):
     mine: bool
     created_at: str
     read_at: str | None = None
+    # Invites only: the project this invite is for, and whether the invitee joined it.
+    project: MessageProject | None = None
+    joined: bool = False
 
 
 class ConversationOut(BaseModel):

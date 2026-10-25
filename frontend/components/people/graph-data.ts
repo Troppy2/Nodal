@@ -14,7 +14,7 @@ export interface PersonNode {
   y: number;
 }
 
-const MAX_PEOPLE = 8;
+const MAX_PEOPLE = 6;
 
 export function layoutPeople(graph: GraphOut, matches: MatchOut[]) {
   const root = graph.root;
@@ -68,7 +68,7 @@ export function layoutPeople(graph: GraphOut, matches: MatchOut[]) {
   nodes.forEach((n, i) => {
     // Evenly around a circle, starting top-left so four people land on the corners.
     const angle = ((-135 + (i * 360) / nodes.length) * Math.PI) / 180;
-    n.x = 50 + Math.cos(angle) * 40;
+    n.x = 50 + Math.cos(angle) * 34;
     n.y = 48 + Math.sin(angle) * 34;
   });
 
