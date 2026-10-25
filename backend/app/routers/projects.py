@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..db import service_client, user_client
 from ..deps import get_current_user, get_optional_user
-from ..models import NeedIn, ProjectDetail, ProjectIn, ProjectList, ProjectPatch
+from ..models import NeedIn, NeedPatch, ProjectDetail, ProjectIn, ProjectList, ProjectPatch
 from ..services import source_service
 from ..services.cards import cards, detail
 from ..slugs import is_uuid, unique_slug
@@ -104,7 +104,7 @@ def create_project(body: ProjectIn, user: dict = Depends(get_current_user)):
     pid = sb.table("projects").insert({
         "owner_id": user["id"], "slug": unique_slug(body.title), "type": body.type, "title": body.title.strip(),
         "summary": body.summary.strip(), "readme_md": body.readme_md, "stage": body.stage,
-        "repo_url": body.repo_url, "demo_url": body.demo_url,
+        "repo_url": body.repo_url, "demo_url": body.demo_url, "cover_url": body.cover_url,
     }).execute().data[0]["id"]
     tags = sorted({t.strip().lower()[:MAX_TAG_LEN] for t in body.tags if t.strip()})
     if tags:
@@ -122,16 +122,69 @@ def create_project(body: ProjectIn, user: dict = Depends(get_current_user)):
 def patch_project(project_id: str, body: ProjectPatch, user: dict = Depends(get_current_user)):
     project = require_owner(project_id, user)
     changes = body.model_dump(exclude_unset=True)
+    tags = changes.pop("tags", None)
     if changes:
-        user_client(user["jwt"]).table("projects").update(changes).eq("id", project_id).execute()
+        service_client().table("projects").update(changes).eq("id", project_id).execute()
+    if tags is not None:
+        clean_tags = sorted({t.strip().lower()[:MAX_TAG_LEN] for t in tags if t.strip()})
+        service_client().table("project_tags").delete().eq("project_id", project_id).execute()
+        if clean_tags:
+            service_client().table("project_tags").insert([{"project_id": project_id, "tag": t} for t in clean_tags]).execute()
     # closing source removes what was uploaded, so nothing stays readable through storage or the tree
     if changes.get("source_access", "open") != "open" and project["source_access"] == "open":
         source_service.remove(project_id)
     return fresh_detail(project_id, user["id"])
 
 
+@router.delete("/projects/{project_id}")
+def delete_project(project_id: str, user: dict = Depends(get_current_user)):
+    require_owner(project_id, user)
+    sb = service_client()
+    # Refund any funded bounties before deleting
+    funded_entries = sb.table("tolken_ledger").select("*").eq("project_id", project_id).eq("status", "funded").execute().data
+    for entry in funded_entries:
+        try:
+            from ..services import tolken_service
+            tolken_service.cancel(entry)
+        except Exception:
+            pass
+    try:
+        source_service.remove(project_id)
+    except Exception:
+        pass
+    sb.table("projects").delete().eq("id", project_id).execute()
+    invalidate()
+    return {"ok": True}
+
+
 @router.post("/projects/{project_id}/needs", response_model=ProjectDetail, status_code=201)
 def add_need(project_id: str, body: NeedIn, user: dict = Depends(get_current_user)):
     require_owner(project_id, user)
-    user_client(user["jwt"]).table("project_needs").insert(_need_rows(project_id, [body], world().skills)).execute()
+    service_client().table("project_needs").insert(_need_rows(project_id, [body], world().skills)).execute()
+    return fresh_detail(project_id, user["id"])
+
+
+@router.patch("/projects/{project_id}/needs/{need_id}", response_model=ProjectDetail)
+def patch_need(project_id: str, need_id: str, body: NeedPatch, user: dict = Depends(get_current_user)):
+    require_owner(project_id, user)
+    changes = body.model_dump(exclude_unset=True)
+    if changes:
+        if "note" in changes and changes["note"]:
+            changes["note"] = changes["note"].strip()[:MAX_NOTE_LEN] or None
+        service_client().table("project_needs").update(changes).eq("id", need_id).eq("project_id", project_id).execute()
+    return fresh_detail(project_id, user["id"])
+
+
+@router.delete("/projects/{project_id}/needs/{need_id}", response_model=ProjectDetail)
+def delete_need(project_id: str, need_id: str, user: dict = Depends(get_current_user)):
+    require_owner(project_id, user)
+    sb = service_client()
+    ledger_entries = sb.table("tolken_ledger").select("*").eq("need_id", need_id).in_("status", ["pending_funding", "funded"]).execute().data
+    for entry in ledger_entries:
+        try:
+            from ..services import tolken_service
+            tolken_service.cancel(entry)
+        except Exception:
+            pass
+    sb.table("project_needs").delete().eq("id", need_id).eq("project_id", project_id).execute()
     return fresh_detail(project_id, user["id"])

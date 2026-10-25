@@ -19,7 +19,7 @@ function tintFor(id: string) {
   return TINTS[Math.abs(h) % TINTS.length];
 }
 
-/** Initials on a tint. `dashed` marks an invited, not-yet-joined member; `ring` marks swap or ring partners. */
+/** Initials on a tint, or image if avatar_url is set. `dashed` marks an invited, not-yet-joined member; `ring` marks swap or ring partners. */
 export function Avatar({
   person,
   size = 36,
@@ -27,14 +27,22 @@ export function Avatar({
   ring,
   className,
 }: {
-  person: Pick<ProfileLite, "id" | "handle" | "display_name">;
+  person: Pick<ProfileLite, "id" | "handle" | "display_name"> & { avatar_url?: string | null };
   size?: number;
   dashed?: boolean;
   ring?: boolean;
   className?: string;
 }) {
   const { fg, bg } = tints[tintFor(person.id)];
-  const inner = (
+  const inner = person.avatar_url ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={person.avatar_url}
+      alt={person.display_name ?? person.handle}
+      style={{ width: size, height: size }}
+      className={cn("flex shrink-0 select-none items-center justify-center rounded-full object-cover", !ring && className)}
+    />
+  ) : (
     <span
       aria-hidden
       style={{ width: size, height: size, fontSize: size * 0.36, color: dashed ? "#5b6b78" : fg, background: dashed ? undefined : bg }}

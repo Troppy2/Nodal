@@ -277,3 +277,22 @@ export interface SourceFileOut {
   content: string | null;
   binary: boolean;
 }
+
+
+export interface ProjectPatch {
+  title?: string | null;
+  summary?: string | null;
+  readme_md?: string | null;
+  stage?: Stage | null;
+  repo_url?: string | null;
+  demo_url?: string | null;
+  cover_url?: string | null;
+  tags?: string[] | null;
+  source_access?: "none" | "open" | null;
+}
+
+export interface NeedPatch {
+  note?: string | null;
+  bounty_tolken?: number | null;
+  status?: "open" | "filled" | null;
+}

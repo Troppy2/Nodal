@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { CollabButton } from "@/components/CollabDialog";
 import { CoverArt } from "@/components/feed/CoverArt";
 import { Label, ProjectMeta } from "@/components/Meta";
@@ -12,11 +14,11 @@ import { PersonDetail } from "@/components/people/PersonDetail";
 import { MobileHeader } from "@/components/shell/MobileHeader";
 import { TabStrip } from "@/components/Tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiError } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import type { GraphOut, MatchOut, ProjectDetail } from "@/lib/api-types";
 import { useSession } from "@/lib/session";
 import { btn } from "@/lib/styles";
-import { useApi } from "@/lib/use-api";
+import { invalidate, useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 import { CoolFactorCard } from "./CoolFactorCard";
 import { CheckSkeleton, LiveRun } from "./LiveRun";
@@ -149,8 +151,25 @@ export function ResultsView({ id }: { id: string }) {
   const [check, setCheck] = useState<CheckId>("market");
   const [mobileTab, setMobileTab] = useState<MobileTab>("people");
   // Only type the summary when this visit watched the run happen; a cached report opens instantly.
+  const router = useRouter();
   const [watchedRunning, setWatchedRunning] = useState(false);
+  const [startingBuild, setStartingBuild] = useState(false);
   const runStatus = research.run?.status;
+
+  async function startBuilding() {
+    if (!project) return;
+    setStartingBuild(true);
+    try {
+      await api(`/projects/${project.id}`, { method: "PATCH", body: { stage: "building" } });
+      toast.success("Project is now building! Code tab and team workspace unlocked.");
+      invalidate("/feed", "/projects", `/projects/${project.id}`);
+      router.push(`/projects/${project.id}`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setStartingBuild(false);
+    }
+  }
   useEffect(() => {
     if (runStatus === "queued" || runStatus === "running") setWatchedRunning(true);
   }, [runStatus]);
@@ -201,9 +220,16 @@ export function ResultsView({ id }: { id: string }) {
   const openNeeds = project.needs.filter((n) => n.status === "open").length;
 
   const primary = own ? (
-    <Link href={`/projects/${project.id}/team`} className={btn.primary}>
-      {isIdea ? "Start building" : "Team"}
-    </Link>
+    isIdea ? (
+      <button onClick={startBuilding} disabled={startingBuild} className={btn.primary}>
+        {startingBuild && <Loader2 className="size-4 animate-spin" />}
+        Start building
+      </button>
+    ) : (
+      <Link href={`/projects/${project.id}/team`} className={btn.primary}>
+        Team
+      </Link>
+    )
   ) : (
     <CollabButton project={project} />
   );
@@ -227,7 +253,7 @@ export function ResultsView({ id }: { id: string }) {
 
       <div className="mx-auto max-w-[1120px] lg:px-8 lg:py-7">
         <header className="hidden items-center gap-4 lg:flex">
-          <CoverArt cover={project.cover} seed={project.id} className="size-14 shrink-0 rounded-lg" />
+          <CoverArt cover={project.cover} seed={project.id} coverUrl={project.cover_url} className="size-14 shrink-0 rounded-lg" />
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-extrabold tracking-tight">{project.title}</h1>
             <ProjectMeta project={project} className="mt-1" />

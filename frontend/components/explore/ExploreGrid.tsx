@@ -18,6 +18,7 @@ const filters: { id: string; label: string; params?: Record<string, string>; sig
   { id: "all", label: "All" },
   { id: "you", label: "Needs you", signedInOnly: true },
   { id: "ideas", label: "Ideas", params: { stage: "idea" } },
+  { id: "shipped", label: "Shipped", params: { stage: "shipped" } },
   { id: "software", label: "Software", params: { type: "software" } },
   { id: "hardware", label: "Hardware", params: { type: "hardware" } },
   { id: "creative", label: "Creative", params: { type: "creative" } },

@@ -3,18 +3,20 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Loader2, Star } from "lucide-react";
+import { Check, Loader2, Pencil, Plus, Rocket, Star, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar } from "@/components/Avatar";
 import { CollabButton } from "@/components/CollabDialog";
 import { CoverArt } from "@/components/feed/CoverArt";
+import { SkillPicker } from "@/components/forms/SkillPicker";
 import { Label, ProjectMeta } from "@/components/Meta";
 import { MobileHeader } from "@/components/shell/MobileHeader";
 import { TabStrip } from "@/components/Tabs";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, ApiError } from "@/lib/api";
-import type { CommentOut, NeedOut, ProjectDetail, TolkenOut } from "@/lib/api-types";
-import { formatTolken } from "@/lib/cover";
+import type { CommentOut, NeedOut, ProjectDetail, ProjectPatch, Skill, Stage, TolkenOut } from "@/lib/api-types";
+import { formatTolken, TOLKEN } from "@/lib/cover";
 import { useSession } from "@/lib/session";
 import { btn } from "@/lib/styles";
 import { invalidate, useApi } from "@/lib/use-api";
@@ -24,6 +26,9 @@ import { SourceBrowser } from "./SourceBrowser";
 import { EmptyState, ErrorState, SignInPrompt, timeAgo } from "./states";
 
 export type ProjectTab = "code" | "readme" | "needs" | "discussion" | "activity";
+
+const inputClass =
+  "w-full rounded-lg border border-line bg-white px-3 text-[14px] text-ink outline-none placeholder:text-muted-ink hover:border-ink/30 focus:border-ink";
 
 /** Only http(s) links render; anything else (javascript:, data:) is dropped. */
 function safeUrl(u: string | null) {
@@ -73,7 +78,7 @@ export function ProjectView({ id, initialTab }: { id: string; initialTab?: strin
     );
   }
   if (!project.data) return <ProjectSkeleton />;
-  return <Loaded project={project.data} mutate={project.mutate} initialTab={initialTab} />;
+  return <Loaded project={project.data} mutate={project.mutate} reload={project.reload} initialTab={initialTab} />;
 }
 
 function ProjectSkeleton() {
@@ -99,19 +104,24 @@ function ProjectSkeleton() {
 function Loaded({
   project,
   mutate,
+  reload,
   initialTab,
 }: {
   project: ProjectDetail;
   mutate: (fn: (p: ProjectDetail | undefined) => ProjectDetail) => void;
+  reload: () => void;
   initialTab?: string;
 }) {
   const { me } = useSession();
+  const router = useRouter();
   const requireSignIn = useRequireSignIn();
   const hasCode = project.has_source;
   const first: ProjectTab = hasCode ? "code" : "readme";
   const valid: ProjectTab[] = [first, "needs", "discussion", "activity"];
   const [tab, setTab] = useState<ProjectTab>(valid.includes(initialTab as ProjectTab) ? (initialTab as ProjectTab) : first);
-  const [busy, setBusy] = useState<"star" | "follow" | null>(null);
+  const [busy, setBusy] = useState<"star" | "follow" | "deleting" | "shipping" | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const owner = me?.profile.id === project.owner.id;
 
@@ -150,6 +160,36 @@ function Loaded({
     });
   }
 
+  async function deleteProject() {
+    setBusy("deleting");
+    try {
+      await api(`/projects/${project.id}`, { method: "DELETE" });
+      toast.success(project.stage === "idea" ? "Idea deleted" : "Project deleted");
+      invalidate("/feed", "/projects", "/profiles/");
+      router.push("/explore");
+    } catch (e) {
+      toast.error((e as Error).message);
+      setBusy(null);
+    }
+  }
+
+  async function markAsShipped() {
+    setBusy("shipping");
+    try {
+      const updated = await api<ProjectDetail>(`/projects/${project.id}`, {
+        method: "PATCH",
+        body: { stage: "shipped" },
+      });
+      mutate(() => updated);
+      toast.success("Congratulations! Project marked as Shipped! 🎉");
+      invalidate("/feed", "/projects", "/profiles/");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const tabs = [
     { id: first, label: hasCode ? "Code" : "Readme" },
     { id: "needs" as const, label: "Needs", count: project.needs.filter((n) => n.status === "open").length },
@@ -163,9 +203,14 @@ function Loaded({
       <div className="mx-auto max-w-[1060px] px-4 py-5 lg:px-8 lg:py-8">
         <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-5">
           <div className="flex min-w-0 flex-1 gap-4">
-            <CoverArt cover={project.cover} seed={project.id} className="size-16 shrink-0 rounded-lg lg:size-[88px]" />
+            <CoverArt cover={project.cover} seed={project.id} coverUrl={project.cover_url} className="size-16 shrink-0 rounded-lg lg:size-[88px]" />
             <div className="min-w-0 flex-1">
-              <h1 className="text-[22px] font-extrabold leading-tight tracking-[-0.02em] lg:text-[28px]">{project.title}</h1>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-[22px] font-extrabold leading-tight tracking-[-0.02em] lg:text-[28px]">{project.title}</h1>
+                {project.stage === "shipped" && (
+                  <span className="rounded-full bg-teal px-2.5 py-0.5 text-xs font-bold text-white">Shipped</span>
+                )}
+              </div>
               <ProjectMeta project={project} className="mt-1.5" />
               <p className="mt-2 flex items-center gap-2 text-sm text-muted-ink">
                 <Avatar person={project.owner} size={20} />
@@ -190,6 +235,19 @@ function Loaded({
                 <Link href={`/projects/${project.id}/team`} className={btn.primary}>
                   Team
                 </Link>
+                {project.stage === "building" && (
+                  <button onClick={markAsShipped} disabled={busy === "shipping"} className={btn.match} title="Mark project as shipped">
+                    <Rocket className="size-4" />
+                    Ship
+                  </button>
+                )}
+                <button onClick={() => setEditing(true)} className={btn.secondary} title="Edit project details">
+                  <Pencil className="size-4" />
+                  Edit
+                </button>
+                <button onClick={() => setConfirmDelete(true)} className={cn(btn.ghost, "text-cool hover:bg-cool/10")} title="Delete project">
+                  <Trash2 className="size-4" />
+                </button>
               </>
             ) : (
               <>
@@ -223,16 +281,248 @@ function Loaded({
               ) : (
                 <p className="text-[15px] leading-relaxed">{project.summary}</p>
               ))}
-            {tab === "needs" && <NeedsTab project={project} owner={owner} />}
+            {tab === "needs" && <NeedsTab project={project} owner={owner} onReload={reload} />}
             {tab === "discussion" && (
-              <Discussion projectId={project.id} onCount={(n) => mutate((p) => ({ ...p!, comment_count: n }))} />
+              <Discussion projectId={project.id} ownerId={project.owner.id} onCount={(n) => mutate((p) => ({ ...p!, comment_count: n }))} />
             )}
             {tab === "activity" && <Activity project={project} />}
           </div>
           <About project={project} />
         </div>
       </div>
+
+      {editing && (
+        <EditProjectDialog
+          project={project}
+          open={editing}
+          onClose={() => setEditing(false)}
+          onSaved={(updated) => {
+            mutate(() => updated);
+            setEditing(false);
+          }}
+        />
+      )}
+
+      {confirmDelete && (
+        <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+          <DialogContent className="sm:max-w-md">
+            <DialogTitle>Delete {project.stage === "idea" ? "idea" : "project"}?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &ldquo;{project.title}&rdquo;? All needs, comments, and members will be permanently removed.
+              Any funded bounties will be returned to your Tolken balance.
+            </DialogDescription>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setConfirmDelete(false)} className={btn.secondary}>
+                Cancel
+              </button>
+              <button type="button" onClick={deleteProject} disabled={busy === "deleting"} className={cn(btn.primary, "bg-cool hover:bg-cool/90")}>
+                {busy === "deleting" && <Loader2 className="size-4 animate-spin" />}
+                Delete permanently
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
+  );
+}
+
+function EditProjectDialog({
+  project,
+  open,
+  onClose,
+  onSaved,
+}: {
+  project: ProjectDetail;
+  open: boolean;
+  onClose: () => void;
+  onSaved: (updated: ProjectDetail) => void;
+}) {
+  const [title, setTitle] = useState(project.title);
+  const [summary, setSummary] = useState(project.summary);
+  const [stage, setStage] = useState<Stage>(project.stage);
+  const [coverUrl, setCoverUrl] = useState(project.cover_url ?? "");
+  const [readme, setReadme] = useState(project.readme_md ?? "");
+  const [repoUrl, setRepoUrl] = useState(project.repo_url ?? "");
+  const [demoUrl, setDemoUrl] = useState(project.demo_url ?? "");
+  const [tagsStr, setTagsStr] = useState(project.tags.join(", "));
+  const [saving, setSaving] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim() || !summary.trim() || saving) return;
+    setSaving(true);
+    const tags = tagsStr
+      .split(/[,]+/)
+      .map((t) => t.trim().toLowerCase().replace(/^#/, ""))
+      .filter(Boolean);
+
+    try {
+      const patch: ProjectPatch = {
+        title: title.trim(),
+        summary: summary.trim(),
+        stage,
+        cover_url: coverUrl.trim() || null,
+        readme_md: readme.trim() || null,
+        repo_url: repoUrl.trim() || null,
+        demo_url: demoUrl.trim() || null,
+        tags,
+      };
+      const updated = await api<ProjectDetail>(`/projects/${project.id}`, { method: "PATCH", body: patch });
+      toast.success("Project updated");
+      invalidate("/feed", "/projects", `/projects/${project.id}`);
+      onSaved(updated);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
+        <DialogTitle>Edit {project.stage === "idea" ? "Idea" : "Project"}</DialogTitle>
+        <DialogDescription>Update details, stage, links, and cover picture.</DialogDescription>
+        <form onSubmit={submit} className="mt-4 flex flex-col gap-4">
+          <div>
+            <label htmlFor="edit-title" className="mb-1 block text-xs font-semibold">
+              Title
+            </label>
+            <input
+              id="edit-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className={cn(inputClass, "h-10")}
+              required
+              maxLength={120}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="edit-stage" className="mb-1 block text-xs font-semibold">
+              Stage
+            </label>
+            <div className="flex gap-2">
+              {(["idea", "building", "shipped"] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setStage(s)}
+                  className={cn(
+                    "flex-1 rounded-md border py-2 text-xs font-semibold capitalize transition-colors",
+                    stage === s ? "border-ink bg-ink text-white" : "border-line text-muted-ink hover:text-ink",
+                  )}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="edit-summary" className="mb-1 block text-xs font-semibold">
+              Caption / Summary
+            </label>
+            <textarea
+              id="edit-summary"
+              rows={2}
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+              className={cn(inputClass, "py-2")}
+              required
+              maxLength={600}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="edit-cover" className="mb-1 block text-xs font-semibold">
+              Cover Image URL <span className="font-normal text-muted-ink">(optional)</span>
+            </label>
+            <input
+              id="edit-cover"
+              type="url"
+              placeholder="https://images.unsplash.com/..."
+              value={coverUrl}
+              onChange={(e) => setCoverUrl(e.target.value)}
+              className={cn(inputClass, "h-10")}
+            />
+            {coverUrl.trim() && (
+              <div className="mt-2 h-24 overflow-hidden rounded-md border border-line">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={coverUrl} alt="Cover preview" className="size-full object-cover" />
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="edit-readme" className="mb-1 block text-xs font-semibold">
+              README.md <span className="font-normal text-muted-ink">(markdown)</span>
+            </label>
+            <textarea
+              id="edit-readme"
+              rows={5}
+              value={readme}
+              onChange={(e) => setReadme(e.target.value)}
+              className={cn(inputClass, "font-mono py-2 text-xs")}
+              placeholder="## What this project is about..."
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="edit-repo" className="mb-1 block text-xs font-semibold">
+                Repository URL
+              </label>
+              <input
+                id="edit-repo"
+                type="url"
+                placeholder="https://github.com/..."
+                value={repoUrl}
+                onChange={(e) => setRepoUrl(e.target.value)}
+                className={cn(inputClass, "h-10 text-xs")}
+              />
+            </div>
+            <div>
+              <label htmlFor="edit-demo" className="mb-1 block text-xs font-semibold">
+                Live Demo URL
+              </label>
+              <input
+                id="edit-demo"
+                type="url"
+                placeholder="https://..."
+                value={demoUrl}
+                onChange={(e) => setDemoUrl(e.target.value)}
+                className={cn(inputClass, "h-10 text-xs")}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="edit-tags" className="mb-1 block text-xs font-semibold">
+              Tags <span className="font-normal text-muted-ink">(comma separated)</span>
+            </label>
+            <input
+              id="edit-tags"
+              value={tagsStr}
+              onChange={(e) => setTagsStr(e.target.value)}
+              placeholder="react, typescript, hardware"
+              className={cn(inputClass, "h-10 text-xs")}
+            />
+          </div>
+
+          <div className="mt-2 flex justify-end gap-2 border-t border-line pt-3">
+            <button type="button" onClick={onClose} className={btn.secondary}>
+              Cancel
+            </button>
+            <button type="submit" disabled={saving || !title.trim() || !summary.trim()} className={btn.primary}>
+              {saving && <Loader2 className="size-4 animate-spin" />}
+              Save changes
+            </button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -267,10 +557,12 @@ function Fitters({ need }: { need: NeedOut }) {
   );
 }
 
-function NeedsTab({ project, owner }: { project: ProjectDetail; owner: boolean }) {
-  // The owner's ledger says which bounties are already funded.
+function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner: boolean; onReload: () => void }) {
   const ledger = useApi<TolkenOut>(owner ? "/me/tolken" : null);
   const [funding, setFunding] = useState<string | null>(null);
+  const [addingNeed, setAddingNeed] = useState(false);
+  const [editingNeed, setEditingNeed] = useState<NeedOut | null>(null);
+  const [busyNeed, setBusyNeed] = useState<string | null>(null);
 
   async function fund(need: NeedOut) {
     setFunding(need.id);
@@ -279,6 +571,7 @@ function NeedsTab({ project, owner }: { project: ProjectDetail; owner: boolean }
       toast.success("Bounty funded", { description: `${formatTolken(need.bounty_tolken!)} held for ${need.skill.name}` });
       invalidate("/me/tolken", "/me");
       ledger.reload();
+      onReload();
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -286,68 +579,379 @@ function NeedsTab({ project, owner }: { project: ProjectDetail; owner: boolean }
     }
   }
 
-  if (project.needs.length === 0) {
-    return (
-      <EmptyState
-        action={
-          owner ? (
-            <Link href="/create" className={btn.secondary}>
-              Post another idea
-            </Link>
-          ) : undefined
-        }
-      >
-        No open needs. This project has what it needs for now.
-      </EmptyState>
-    );
+  async function toggleStatus(need: NeedOut) {
+    setBusyNeed(need.id);
+    const nextStatus = need.status === "open" ? "filled" : "open";
+    try {
+      await api(`/projects/${project.id}/needs/${need.id}`, {
+        method: "PATCH",
+        body: { status: nextStatus },
+      });
+      toast.success(nextStatus === "filled" ? "Need marked as filled" : "Need reopened");
+      invalidate(`/projects/${project.id}`);
+      onReload();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusyNeed(null);
+    }
+  }
+
+  async function deleteNeed(need: NeedOut) {
+    if (!confirm(`Remove ${need.skill.name} from project needs?`)) return;
+    setBusyNeed(need.id);
+    try {
+      await api(`/projects/${project.id}/needs/${need.id}`, { method: "DELETE" });
+      toast.success("Need removed");
+      invalidate(`/projects/${project.id}`);
+      onReload();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusyNeed(null);
+    }
   }
 
   return (
-    <ul className="flex flex-col divide-y divide-line rounded-xl border border-line">
-      {project.needs.map((n) => {
-        const entry = ledger.data?.ledger.find((e) => e.need_id === n.id && ["funded", "released"].includes(e.status));
-        return (
-          <li key={n.id} className={cn("flex flex-col gap-3 p-4 sm:flex-row sm:items-center", n.viewer_fits && "bg-teal-tint/50")}>
-            <div className="min-w-0 flex-1">
-              <p className="flex flex-wrap items-baseline gap-x-2 font-semibold">
-                {n.skill.name}
-                {n.bounty_tolken && <span className="text-xs font-medium text-teal">{formatTolken(n.bounty_tolken)} bounty</span>}
-                {n.status === "filled" && <span className="text-xs font-medium text-muted-ink">Filled</span>}
-                {n.viewer_fits && n.status === "open" && <span className="text-xs text-teal">You fit</span>}
-              </p>
-              {n.note && <p className="text-sm text-muted-ink">{n.note}</p>}
-              <div className="mt-2 flex items-center gap-2 text-[13px] text-muted-ink">
-                <Fitters need={n} />
-              </div>
-            </div>
-            {owner ? (
-              n.bounty_tolken ? (
-                entry ? (
-                  <span className={cn(btn.done, "w-full sm:w-auto")}>
-                    {entry.status === "released" ? "Paid" : "Funded"} {formatTolken(n.bounty_tolken)}
-                  </span>
-                ) : (
-                  <button onClick={() => fund(n)} disabled={funding === n.id} className={cn(btn.secondary, "w-full sm:w-auto")}>
-                    {funding === n.id && <Loader2 className="size-4 animate-spin" />}
-                    Fund {formatTolken(n.bounty_tolken)}
-                  </button>
-                )
-              ) : null
-            ) : n.status === "open" ? (
-              <CollabButton project={project} skillId={n.skill.id} label="Offer" className="w-full sm:w-auto" />
-            ) : null}
-          </li>
-        );
-      })}
-    </ul>
+    <div className="flex flex-col gap-4">
+      {owner && (
+        <div className="flex items-center justify-between border-b border-line pb-3">
+          <p className="text-sm font-semibold">
+            {project.needs.filter((n) => n.status === "open").length} open needs
+          </p>
+          <button onClick={() => setAddingNeed(true)} className={cn(btn.primary, "h-8 text-xs")}>
+            <Plus className="size-3.5" /> Add need
+          </button>
+        </div>
+      )}
+
+      {project.needs.length === 0 ? (
+        <EmptyState
+          action={
+            owner ? (
+              <button onClick={() => setAddingNeed(true)} className={btn.primary}>
+                Add your first needed skill
+              </button>
+            ) : undefined
+          }
+        >
+          No needs listed yet.
+        </EmptyState>
+      ) : (
+        <ul className="flex flex-col divide-y divide-line rounded-xl border border-line">
+          {project.needs.map((n) => {
+            const entry = ledger.data?.ledger.find((e) => e.need_id === n.id && ["funded", "released"].includes(e.status));
+            return (
+              <li key={n.id} className={cn("flex flex-col gap-3 p-4 sm:flex-row sm:items-center", n.viewer_fits && n.status === "open" && "bg-teal-tint/50")}>
+                <div className="min-w-0 flex-1">
+                  <p className="flex flex-wrap items-baseline gap-x-2 font-semibold">
+                    {n.skill.name}
+                    {n.bounty_tolken && <span className="text-xs font-medium text-teal">{formatTolken(n.bounty_tolken)} bounty</span>}
+                    {n.status === "filled" && <span className="rounded bg-sunken px-1.5 py-0.5 text-xs font-medium text-muted-ink">Filled</span>}
+                    {n.viewer_fits && n.status === "open" && <span className="text-xs text-teal">You fit</span>}
+                  </p>
+                  {n.note && <p className="mt-0.5 text-sm text-muted-ink">{n.note}</p>}
+                  <div className="mt-2 flex items-center gap-2 text-[13px] text-muted-ink">
+                    <Fitters need={n} />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {owner ? (
+                    <>
+                      {n.bounty_tolken ? (
+                        entry ? (
+                          <span className={cn(btn.done, "text-xs")}>
+                            {entry.status === "released" ? "Paid" : "Funded"} {formatTolken(n.bounty_tolken)}
+                          </span>
+                        ) : (
+                          <button onClick={() => fund(n)} disabled={funding === n.id} className={cn(btn.secondary, "text-xs")}>
+                            {funding === n.id && <Loader2 className="size-3.5 animate-spin" />}
+                            Fund {formatTolken(n.bounty_tolken)}
+                          </button>
+                        )
+                      ) : null}
+
+                      <button
+                        onClick={() => toggleStatus(n)}
+                        disabled={busyNeed === n.id}
+                        className={cn(btn.ghost, "h-8 px-2 text-xs")}
+                        title={n.status === "open" ? "Mark as filled" : "Reopen need"}
+                      >
+                        {n.status === "open" ? <Check className="size-3.5" /> : "Reopen"}
+                      </button>
+                      <button onClick={() => setEditingNeed(n)} className={cn(btn.ghost, "h-8 px-2 text-xs")} title="Edit need">
+                        <Pencil className="size-3.5" />
+                      </button>
+                      <button onClick={() => deleteNeed(n)} disabled={busyNeed === n.id} className={cn(btn.ghost, "h-8 px-2 text-xs text-cool hover:bg-cool/10")} title="Delete need">
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </>
+                  ) : n.status === "open" ? (
+                    <CollabButton project={project} skillId={n.skill.id} label="Offer" className="w-full sm:w-auto" />
+                  ) : null}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {addingNeed && (
+        <AddNeedDialog
+          projectId={project.id}
+          excludeSkillIds={project.needs.map((n) => n.skill.id)}
+          open={addingNeed}
+          onClose={() => setAddingNeed(false)}
+          onAdded={() => {
+            setAddingNeed(false);
+            onReload();
+          }}
+        />
+      )}
+
+      {editingNeed && (
+        <EditNeedDialog
+          projectId={project.id}
+          need={editingNeed}
+          open={Boolean(editingNeed)}
+          onClose={() => setEditingNeed(null)}
+          onSaved={() => {
+            setEditingNeed(null);
+            onReload();
+          }}
+        />
+      )}
+    </div>
   );
 }
 
-function Discussion({ projectId, onCount }: { projectId: string; onCount: (n: number) => void }) {
+function AddNeedDialog({
+  projectId,
+  excludeSkillIds,
+  open,
+  onClose,
+  onAdded,
+}: {
+  projectId: string;
+  excludeSkillIds: number[];
+  open: boolean;
+  onClose: () => void;
+  onAdded: () => void;
+}) {
+  const [skill, setSkill] = useState<Skill | null>(null);
+  const [note, setNote] = useState("");
+  const [bounty, setBounty] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!skill || saving) return;
+    setSaving(true);
+    try {
+      await api(`/projects/${projectId}/needs`, {
+        method: "POST",
+        body: {
+          skill_id: skill.id,
+          note: note.trim() || null,
+          bounty_tolken: Number(bounty) > 0 ? Number(bounty) : null,
+        },
+      });
+      toast.success(`Added ${skill.name} to needs`);
+      invalidate(`/projects/${projectId}`);
+      onAdded();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogTitle>Add a needed skill</DialogTitle>
+        <DialogDescription>Select what kind of help you need and optionally attach a bounty.</DialogDescription>
+        <form onSubmit={submit} className="mt-4 flex flex-col gap-4">
+          <div>
+            <label className="mb-1 block text-xs font-semibold">Skill</label>
+            {skill ? (
+              <div className="flex items-center justify-between rounded-lg border border-line p-2 text-sm">
+                <span className="font-semibold">{skill.name}</span>
+                <button type="button" onClick={() => setSkill(null)} className="text-muted-ink hover:text-ink">
+                  <X className="size-4" />
+                </button>
+              </div>
+            ) : (
+              <SkillPicker exclude={excludeSkillIds} onAdd={setSkill} />
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="need-note" className="mb-1 block text-xs font-semibold">
+              Note <span className="font-normal text-muted-ink">(what will they build?)</span>
+            </label>
+            <input
+              id="need-note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. Build the Bluetooth sync module"
+              className={cn(inputClass, "h-10 text-xs")}
+              maxLength={200}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="need-bounty" className="mb-1 block text-xs font-semibold">
+              Bounty in Tolken <span className="font-normal text-muted-ink">(optional)</span>
+            </label>
+            <div className="flex items-center gap-1 rounded-lg border border-line px-3 focus-within:border-ink">
+              <span className="text-muted-ink">{TOLKEN}</span>
+              <input
+                id="need-bounty"
+                inputMode="numeric"
+                value={bounty}
+                onChange={(e) => setBounty(e.target.value.replace(/[^0-9]/g, "").slice(0, 5))}
+                placeholder="0"
+                className="h-10 flex-1 bg-transparent text-sm outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="mt-2 flex justify-end gap-2 border-t border-line pt-3">
+            <button type="button" onClick={onClose} className={btn.secondary}>
+              Cancel
+            </button>
+            <button type="submit" disabled={!skill || saving} className={btn.primary}>
+              {saving && <Loader2 className="size-4 animate-spin" />}
+              Add need
+            </button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditNeedDialog({
+  projectId,
+  need,
+  open,
+  onClose,
+  onSaved,
+}: {
+  projectId: string;
+  need: NeedOut;
+  open: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [note, setNote] = useState(need.note ?? "");
+  const [bounty, setBounty] = useState(need.bounty_tolken ? String(need.bounty_tolken) : "");
+  const [status, setStatus] = useState<"open" | "filled">(need.status);
+  const [saving, setSaving] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (saving) return;
+    setSaving(true);
+    try {
+      await api(`/projects/${projectId}/needs/${need.id}`, {
+        method: "PATCH",
+        body: {
+          note: note.trim() || null,
+          bounty_tolken: Number(bounty) > 0 ? Number(bounty) : null,
+          status,
+        },
+      });
+      toast.success("Need updated");
+      invalidate(`/projects/${projectId}`);
+      onSaved();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogTitle>Edit need: {need.skill.name}</DialogTitle>
+        <DialogDescription>Update details, bounty, or status.</DialogDescription>
+        <form onSubmit={submit} className="mt-4 flex flex-col gap-4">
+          <div>
+            <label htmlFor="edit-need-status" className="mb-1 block text-xs font-semibold">
+              Status
+            </label>
+            <div className="flex gap-2">
+              {(["open", "filled"] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setStatus(s)}
+                  className={cn(
+                    "flex-1 rounded-md border py-1.5 text-xs font-semibold capitalize transition-colors",
+                    status === s ? "border-ink bg-ink text-white" : "border-line text-muted-ink hover:text-ink",
+                  )}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="edit-need-note" className="mb-1 block text-xs font-semibold">
+              Note
+            </label>
+            <input
+              id="edit-need-note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              className={cn(inputClass, "h-10 text-xs")}
+              maxLength={200}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="edit-need-bounty" className="mb-1 block text-xs font-semibold">
+              Bounty in Tolken
+            </label>
+            <div className="flex items-center gap-1 rounded-lg border border-line px-3 focus-within:border-ink">
+              <span className="text-muted-ink">{TOLKEN}</span>
+              <input
+                id="edit-need-bounty"
+                inputMode="numeric"
+                value={bounty}
+                onChange={(e) => setBounty(e.target.value.replace(/[^0-9]/g, "").slice(0, 5))}
+                placeholder="0"
+                className="h-10 flex-1 bg-transparent text-sm outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="mt-2 flex justify-end gap-2 border-t border-line pt-3">
+            <button type="button" onClick={onClose} className={btn.secondary}>
+              Cancel
+            </button>
+            <button type="submit" disabled={saving} className={btn.primary}>
+              {saving && <Loader2 className="size-4 animate-spin" />}
+              Save changes
+            </button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Discussion({ projectId, ownerId, onCount }: { projectId: string; ownerId: string; onCount: (n: number) => void }) {
   const { me, signedIn } = useSession();
   const comments = useApi<CommentOut[]>(`/projects/${projectId}/comments`);
   const [body, setBody] = useState("");
   const [posting, setPosting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function post() {
     const text = body.trim();
@@ -364,6 +968,21 @@ function Discussion({ projectId, onCount }: { projectId: string; onCount: (n: nu
       toast.error((e as Error).message);
     } finally {
       setPosting(false);
+    }
+  }
+
+  async function deleteComment(id: string) {
+    setDeletingId(id);
+    try {
+      await api(`/projects/${projectId}/comments/${id}`, { method: "DELETE" });
+      const next = (comments.data ?? []).filter((c) => c.id !== id);
+      comments.mutate(next);
+      onCount(next.length);
+      toast.success("Comment deleted");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -387,22 +1006,37 @@ function Discussion({ projectId, onCount }: { projectId: string; onCount: (n: nu
         <EmptyState>No comments yet. Ask a question or say how you&apos;d help.</EmptyState>
       ) : (
         <ul className="flex flex-col divide-y divide-line">
-          {comments.data.map((c) => (
-            <li key={c.id} className="flex gap-3 py-4 first:pt-0">
-              <Link href={`/u/${c.author.handle}`}>
-                <Avatar person={c.author} size={32} />
-              </Link>
-              <div className="min-w-0 text-[15px]">
-                <p className="flex items-baseline gap-2">
-                  <Link href={`/u/${c.author.handle}`} className="font-semibold hover:underline">
-                    {c.author.handle}
-                  </Link>
-                  <span className="text-xs text-muted-ink">{timeAgo(c.created_at)}</span>
-                </p>
-                <p className="mt-0.5 whitespace-pre-wrap leading-relaxed">{c.body}</p>
-              </div>
-            </li>
-          ))}
+          {comments.data.map((c) => {
+            const canDelete = me && (me.profile.id === c.author.id || me.profile.id === ownerId);
+            return (
+              <li key={c.id} className="group flex gap-3 py-4 first:pt-0">
+                <Link href={`/u/${c.author.handle}`}>
+                  <Avatar person={c.author} size={32} />
+                </Link>
+                <div className="min-w-0 flex-1 text-[15px]">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="flex items-baseline gap-2">
+                      <Link href={`/u/${c.author.handle}`} className="font-semibold hover:underline">
+                        {c.author.handle}
+                      </Link>
+                      <span className="text-xs text-muted-ink">{timeAgo(c.created_at)}</span>
+                    </p>
+                    {canDelete && (
+                      <button
+                        onClick={() => deleteComment(c.id)}
+                        disabled={deletingId === c.id}
+                        className="text-muted-ink opacity-0 transition-opacity hover:text-cool group-hover:opacity-100"
+                        title="Delete comment"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <p className="mt-0.5 whitespace-pre-wrap leading-relaxed">{c.body}</p>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
       {signedIn && me ? (

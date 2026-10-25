@@ -121,6 +121,7 @@ class ProjectIn(BaseModel):
     readme_md: str | None = None
     repo_url: WebUrl = None
     demo_url: WebUrl = None
+    cover_url: WebUrl = None
     tags: list[str] = Field(default=[], max_length=10)
     needs: list[NeedIn] = []
 
@@ -132,7 +133,15 @@ class ProjectPatch(BaseModel):
     stage: Stage | None = None
     repo_url: WebUrl = None
     demo_url: WebUrl = None
+    cover_url: WebUrl = None
+    tags: list[str] | None = None
     source_access: Literal["none", "open"] | None = None
+
+
+class NeedPatch(BaseModel):
+    note: str | None = None
+    bounty_tolken: int | None = Field(default=None, gt=0)
+    status: Literal["open", "filled"] | None = None
 
 
 # ---------- comments and collab requests ----------
@@ -208,6 +217,7 @@ class MeIn(BaseModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=60)
     handle: str | None = Field(default=None, pattern=r"^[a-z0-9][a-z0-9-]{1,29}$")
     bio: str | None = Field(default=None, max_length=280)
+    avatar_url: WebUrl = None
 
 
 class OfferIn(BaseModel):

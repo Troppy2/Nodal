@@ -5,7 +5,7 @@ from ..models import CommentIn, CommentOut
 from ..ratelimit import rate_limit
 from ..services.cards import profile_lite
 from ..world import world
-from .projects import known_project
+from .projects import known_project, project_row
 
 router = APIRouter()
 MAX_LEN = 2000
@@ -33,3 +33,18 @@ def add_comment(project_id: str, body: CommentIn, user: dict = Depends(rate_limi
     row = user_client(user["jwt"]).table("comments").insert(
         {"project_id": pid, "author_id": user["id"], "body": text[:MAX_LEN]}).execute().data[0]
     return _out([row])[0]
+
+
+@router.delete("/projects/{project_id}/comments/{comment_id}")
+def delete_comment(project_id: str, comment_id: str, user: dict = Depends(get_current_user)):
+    pid = known_project(world(), project_id)
+    sb = service_client()
+    rows = sb.table("comments").select("*").eq("id", comment_id).eq("project_id", pid).execute().data
+    if not rows:
+        raise HTTPException(404, "Comment not found")
+    comment = rows[0]
+    proj = project_row(pid)
+    if comment["author_id"] != user["id"] and proj["owner_id"] != user["id"]:
+        raise HTTPException(403, "Only the comment author or project owner can delete this comment")
+    sb.table("comments").delete().eq("id", comment_id).execute()
+    return {"ok": True}
