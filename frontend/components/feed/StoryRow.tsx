@@ -5,7 +5,6 @@ import { Avatar } from "@/components/Avatar";
 import { Label } from "@/components/Meta";
 import type { Story } from "@/lib/api-types";
 import { useSession } from "@/lib/session";
-import { cn } from "@/lib/utils";
 import { useApi } from "@/lib/use-api";
 
 function firstName(person: { display_name: string | null; handle: string }) {
@@ -46,16 +45,22 @@ export function StoryRow() {
         {stories.map(({ profile, tag, trade }) => (
           <Link
             key={profile.id}
-            href={tag ? "/inbox" : `/u/${profile.handle}`}
+            href={tag ? "/requests" : `/u/${profile.handle}`}
             title={trade ?? undefined}
             className="group flex w-[76px] shrink-0 flex-col items-center gap-1.5 rounded-lg px-1 py-1 transition-colors hover:bg-sunken"
           >
             <Avatar person={profile} size={52} ring={tag !== null} />
             <span className="flex max-w-full flex-col items-center leading-tight">
               <span className="max-w-full truncate text-xs font-medium">{firstName(profile)}</span>
-              <span className={cn("max-w-full truncate text-[11px]", tag ? "font-semibold text-teal" : "text-muted-ink")}>
-                {tag === "ring" ? "Ring" : tag === "swap" ? "Swap" : `@${profile.handle}`}
-              </span>
+              {tag ? (
+                <span className="mt-0.5 inline-flex items-center rounded-md bg-teal-tint px-1.5 py-0.2 text-[10px] font-bold uppercase tracking-wider text-teal border border-teal/20">
+                  {tag === "ring" ? "Ring" : "Swap"}
+                </span>
+              ) : (
+                <span className="max-w-full truncate text-[11px] text-muted-ink">
+                  @{profile.handle}
+                </span>
+              )}
             </span>
           </Link>
         ))}
