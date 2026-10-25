@@ -13,7 +13,7 @@ import { btn } from "@/lib/styles";
 import { useApi } from "@/lib/use-api";
 import { PostCard, PostCardSkeleton } from "./PostCard";
 
-type Tab = "for_you" | "following" | "ideas";
+type Tab = "for_you" | "following" | "ideas" | "projects";
 
 const empty: Record<Tab, { text: string; action: React.ReactNode }> = {
   for_you: {
@@ -37,6 +37,14 @@ const empty: Record<Tab, { text: string; action: React.ReactNode }> = {
     action: (
       <Link href="/create" className={btn.primary}>
         Post an idea
+      </Link>
+    ),
+  },
+  projects: {
+    text: "No projects being built right now. Post what you're working on and find collaborators.",
+    action: (
+      <Link href="/create" className={btn.primary}>
+        Post a project
       </Link>
     ),
   },
@@ -112,6 +120,7 @@ export function FeedTabs() {
           { id: "for_you", label: "For you" },
           { id: "following", label: "Following" },
           { id: "ideas", label: "Ideas" },
+          { id: "projects", label: "Projects" },
         ]}
         className="px-4 max-lg:[&>button]:flex-1 lg:gap-7 lg:px-0"
       />

@@ -25,18 +25,20 @@ def _offset(cursor: str | None) -> int:
 
 @router.get("/feed", response_model=FeedResponse)
 def feed(
-    tab: Literal["for_you", "following", "ideas"] = "for_you",
+    tab: Literal["for_you", "following", "ideas", "projects"] = "for_you",
     cursor: str | None = None,
     user: dict | None = Depends(get_optional_user),
 ):
     """for_you: recommendation order, then everything else by recency (own projects excluded).
-    following: projects by people I follow plus ones I starred. ideas: stage idea. Anonymous visitors
-    get recency for for_you and an empty following tab."""
+    following: projects by people I follow plus ones I starred. ideas: stage idea.
+    projects: stage building or shipped. Anonymous visitors get recency for for_you and an empty following tab."""
     w = world()
     viewer = user["id"] if user else None
     mine = set(w.owned.get(viewer, []))
     if tab == "ideas":
         ordered = w.newest_first(p for p, v in w.projects.items() if v["stage"] == "idea")
+    elif tab == "projects":
+        ordered = w.newest_first(p for p, v in w.projects.items() if v["stage"] != "idea")
     elif tab == "following":
         followees = w.follows.get(viewer, {})
         starred = {p for p, who in w.stars.items() if viewer in who}
