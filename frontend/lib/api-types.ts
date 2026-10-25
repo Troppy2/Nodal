@@ -35,7 +35,7 @@ export interface NeedOut {
   skill: Skill;
   note: string | null;
   bounty_tolken: number | null;
-  status: "open" | "claimed" | "filled";
+  status: "open" | "filled";
   fitters: ProfileLite[];
   viewer_fits: boolean;
   viewer_requested: boolean;

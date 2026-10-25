@@ -757,7 +757,7 @@ function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner:
                   "flex flex-col gap-3 p-4 sm:flex-row sm:items-center transition-all duration-300",
                   n.viewer_fits && n.status === "open" && "bg-teal-tint/50",
                   isHighlighted && "ring-2 ring-teal bg-teal-tint/30 rounded-lg",
-                  n.status === "claimed" && "bg-amber-500/5",
+                  
                 )}
               >
                 <div className="min-w-0 flex-1">
@@ -770,7 +770,7 @@ function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner:
                       </span>
                     )}
                     {n.status === "filled" && <span className="rounded bg-sunken px-1.5 py-0.5 text-xs font-medium text-muted-ink">Filled</span>}
-                    {n.status === "claimed" && <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-xs font-semibold text-amber-700">Work Submitted</span>}
+                    
                     {n.viewer_fits && n.status === "open" && <span className="text-xs text-teal">You fit</span>}
                   </p>
                   {n.note && <p className="mt-0.5 text-sm text-muted-ink">{n.note}</p>}
@@ -807,7 +807,7 @@ function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner:
                         )
                       ) : null}
 
-                      {n.status === "claimed" ? (
+                      {entry?.status === "funded" && n.status === "open" && (
                         <button
                           onClick={() => confirmWork(n)}
                           disabled={actingWork === n.id}
@@ -816,16 +816,16 @@ function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner:
                           {actingWork === n.id && <Loader2 className="size-3.5 animate-spin mr-1" />}
                           Confirm Work & Release
                         </button>
-                      ) : (
-                        <button
-                          onClick={() => toggleStatus(n)}
-                          disabled={busyNeed === n.id}
-                          className={cn(btn.ghost, "h-8 px-2 text-xs")}
-                          title={n.status === "open" ? "Mark as filled" : "Reopen need"}
-                        >
-                          {n.status === "open" ? <Check className="size-3.5" /> : "Reopen"}
-                        </button>
                       )}
+
+                      <button
+                        onClick={() => toggleStatus(n)}
+                        disabled={busyNeed === n.id}
+                        className={cn(btn.ghost, "h-8 px-2 text-xs")}
+                        title={n.status === "open" ? "Mark as filled" : "Reopen need"}
+                      >
+                        {n.status === "open" ? <Check className="size-3.5" /> : "Reopen"}
+                      </button>
 
                       <button onClick={() => setEditingNeed(n)} className={cn(btn.ghost, "h-8 px-2 text-xs")} title="Edit need">
                         <Pencil className="size-3.5" />
@@ -849,11 +849,7 @@ function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner:
                           Submit Work
                         </button>
                       )}
-                      {n.status === "claimed" && (
-                        <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200">
-                          Awaiting Approval
-                        </span>
-                      )}
+
                     </>
                   )}
                 </div>
@@ -1014,7 +1010,7 @@ function EditNeedDialog({
 }) {
   const [note, setNote] = useState(need.note ?? "");
   const [bounty, setBounty] = useState(need.bounty_tolken ? String(need.bounty_tolken) : "");
-  const [status, setStatus] = useState<"open" | "claimed" | "filled">(need.status);
+  const [status, setStatus] = useState<"open" | "filled">(need.status);
   const [saving, setSaving] = useState(false);
 
   async function submit(e: React.FormEvent) {
