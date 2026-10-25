@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { ChevronRight, Link2, Loader2, MessageCircle, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar } from "@/components/Avatar";
@@ -57,8 +57,16 @@ function ProfileSkeleton() {
 }
 
 function Profile({ handle }: { handle: string }) {
+  const searchParams = useSearchParams();
+  const queryTab = searchParams.get("tab");
   const profile = useApi<ProfileOut>(`/profiles/${encodeURIComponent(handle)}`);
-  const [tab, setTab] = useState<Tab>("projects");
+  const [tab, setTab] = useState<Tab>(queryTab === "tolken" ? "tolken" : queryTab === "ideas" ? "ideas" : "projects");
+
+  useEffect(() => {
+    if (queryTab === "tolken" || queryTab === "ideas" || queryTab === "projects") {
+      setTab(queryTab);
+    }
+  }, [queryTab]);
 
   if (profile.error) {
     const missing = profile.error instanceof ApiError && profile.error.status === 404;

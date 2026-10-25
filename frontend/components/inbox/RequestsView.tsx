@@ -284,7 +284,7 @@ export function RequestsView() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const { ready, signedIn, me } = useSession();
+  const { ready, signedIn, me, refreshMe } = useSession();
 
   const inbox = useApi<InboxItem[]>(signedIn ? "/me/inbox" : null);
   const cycles = useApi<Cycle[]>(signedIn ? "/me/cycles" : null);
@@ -354,7 +354,8 @@ export function RequestsView() {
         replace(res);
       }
       toast.success(response === "accepted" ? "Accepted!" : "Declined");
-      invalidate("/projects", "/me/cycles", "/feed", "/me/projects");
+      invalidate("/projects", "/me/cycles", "/feed", "/me/projects", "/me/tolken", "/me");
+      refreshMe();
     } catch (e) {
       toast.error((e as Error).message);
     } finally {

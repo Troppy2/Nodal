@@ -6,6 +6,7 @@ import { Crown, Plus, Star, Users, ArrowUpRight } from "lucide-react";
 import { CoverArt } from "@/components/feed/CoverArt";
 import { ProjectMeta } from "@/components/Meta";
 import { EmptyState, ErrorState } from "@/components/checks/States";
+import { formatTolken, TOLKEN } from "@/lib/cover";
 import type { MyProjectsOut, ProjectCard } from "@/lib/api-types";
 import { useSession } from "@/lib/session";
 import { btn } from "@/lib/styles";
@@ -24,6 +25,7 @@ function MyProjectCard({
   skillName?: string | null;
 }) {
   const openNeeds = project.needs.filter((n) => n.status === "open");
+  const totalBounty = openNeeds.reduce((sum, n) => sum + (n.bounty_tolken || 0), 0);
   const href = project.stage === "idea" && isOwner ? `/projects/${project.id}/results` : `/projects/${project.id}`;
 
   return (
@@ -46,6 +48,11 @@ function MyProjectCard({
             </span>
           )}
         </div>
+        {totalBounty > 0 && (
+          <span className="absolute top-2.5 right-2.5 rounded-md bg-teal/95 backdrop-blur-xs px-2.5 py-1 text-[11px] font-black text-white shadow-xs flex items-center gap-1">
+            <span>{TOLKEN}</span> {totalBounty} bounty
+          </span>
+        )}
       </Link>
 
       <div className="mt-3.5 flex flex-1 flex-col">
@@ -73,6 +80,9 @@ function MyProjectCard({
             {openNeeds.slice(0, 3).map((n) => (
               <span key={n.id} className="rounded-md bg-sunken px-2 py-0.5 text-[11px] font-medium text-ink">
                 {n.skill.name}
+                {n.bounty_tolken ? (
+                  <span className="font-semibold text-teal"> ({formatTolken(n.bounty_tolken)})</span>
+                ) : null}
               </span>
             ))}
             {openNeeds.length > 3 && <span className="text-[11px]">+{openNeeds.length - 3} more</span>}

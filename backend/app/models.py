@@ -3,7 +3,7 @@
 
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field, model_validator
 
 ProjectType = Literal["software", "hardware", "creative"]
 
@@ -38,8 +38,8 @@ class ProfileLite(BaseModel):
 class Skill(BaseModel):
     id: int
     name: str
-    slug: str
-    category: ProjectType
+    slug: str = ""
+    category: ProjectType = "software"
 
 
 class Offer(BaseModel):
@@ -274,6 +274,26 @@ class CycleLink(BaseModel):
     skill: Skill
 
     model_config = {"populate_by_name": True}
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_skill(cls, data):
+        if isinstance(data, dict):
+            skill_val = data.get("skill")
+            if not isinstance(skill_val, dict) or not skill_val.get("name"):
+                data = dict(data)
+                sid = data.get("skill_id")
+                try:
+                    sid = int(sid) if sid is not None else 0
+                except (ValueError, TypeError):
+                    sid = 0
+                data["skill"] = {
+                    "id": sid,
+                    "name": data.get("skill_name") or "Skill",
+                    "slug": data.get("skill_slug") or "skill",
+                    "category": data.get("skill_category") or "software",
+                }
+        return data
 
 
 class Cycle(BaseModel):
