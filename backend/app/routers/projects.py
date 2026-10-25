@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..db import service_client, user_client
@@ -171,6 +173,12 @@ def patch_need(project_id: str, need_id: str, body: NeedPatch, user: dict = Depe
     if changes:
         if "note" in changes and changes["note"]:
             changes["note"] = changes["note"].strip()[:MAX_NOTE_LEN] or None
+        need = need_row(project_id, need_id)
+        if changes.get("status") == "filled" and need["status"] == "open":
+            # marking filled credits whoever submitted work; with no submission nobody is credited
+            changes.update(completion(need["submitted_by"]))
+        elif changes.get("status") == "open":
+            changes.update({"completed_by": None, "completed_at": None, "submitted_by": None})
         service_client().table("project_needs").update(changes).eq("id", need_id).eq("project_id", project_id).execute()
     return fresh_detail(project_id, user["id"])
 
@@ -189,51 +197,63 @@ def delete_need(project_id: str, need_id: str, user: dict = Depends(get_current_
     sb.table("project_needs").delete().eq("id", need_id).eq("project_id", project_id).execute()
     return fresh_detail(project_id, user["id"])
 
+def need_row(project_id: str, need_id: str) -> dict:
+    rows = service_client().table("project_needs").select("*").eq("id", need_id).eq("project_id", project_id).execute().data
+    if not rows:
+        raise HTTPException(404, "Need not found")
+    return rows[0]
+
+
+def completion(profile_id: str | None) -> dict:
+    """Columns that close a need and credit it to profile_id (nobody when None)."""
+    return {"status": "filled", "completed_by": profile_id,
+            "completed_at": datetime.now(timezone.utc).isoformat() if profile_id else None}
+
+
 @router.post("/projects/{project_id}/needs/{need_id}/submit-work", response_model=ProjectDetail)
 def submit_work(project_id: str, need_id: str, user: dict = Depends(get_current_user)):
+    """A joined team member hands in work on an open need; the owner then confirms it."""
     me = user["id"]
+    project = project_row(project_id)
+    if project["owner_id"] == me:
+        raise HTTPException(409, "You own this project. Mark the need filled instead")
     sb = service_client()
-    needs = sb.table("project_needs").select("*").eq("id", need_id).eq("project_id", project_id).execute().data
-    if not needs:
-        raise HTTPException(404, "Need not found")
+    joined = sb.table("project_members").select("profile_id").eq("project_id", project["id"]) \
+        .eq("profile_id", me).eq("status", "joined").execute().data
+    if not joined:
+        raise HTTPException(403, "Join the team before submitting work")
+    need = need_row(project["id"], need_id)
+    if need["status"] != "open":
+        raise HTTPException(409, "This need is already filled")
+    if need.get("submitted_by") and need["submitted_by"] != me:
+        raise HTTPException(409, "Someone else already submitted work for this need")
 
-    ledger = sb.table("tolken_ledger").select("*").eq("need_id", need_id).in_("status", ["pending_funding", "funded"]).execute().data
-    for entry in ledger:
-        if not entry.get("contributor_id"):
-            sb.table("tolken_ledger").update({"contributor_id": me}).eq("id", entry["id"]).execute()
-
-    w = world()
-    skill_name = w.skills.get(needs[0]["skill_id"], {}).get("name", "skill")
-    sb.table("comments").insert({
-        "project_id": project_id,
-        "author_id": me,
-        "body": f"Submitted work for {skill_name}! Ready for your review."
-    }).execute()
-
-    return fresh_detail(project_id, user["id"])
+    sb.table("project_needs").update({"submitted_by": me}).eq("id", need_id).execute()
+    sb.table("tolken_ledger").update({"contributor_id": me}).eq("need_id", need_id) \
+        .in_("status", ["pending_funding", "funded"]).is_("contributor_id", "null").execute()
+    skill_name = world().skills.get(need["skill_id"], {}).get("name", "skill")
+    sb.table("comments").insert({"project_id": project["id"], "author_id": me,
+                                 "body": f"Submitted work for {skill_name}. Ready for your review."}).execute()
+    return fresh_detail(project["id"], me)
 
 
 @router.post("/projects/{project_id}/needs/{need_id}/confirm-work", response_model=ProjectDetail)
 def confirm_work(project_id: str, need_id: str, user: dict = Depends(get_current_user)):
-    require_owner(project_id, user)
+    """Owner accepts the work: pays any bounty, closes the need, and credits the contributor.
+    Tolken moves first, so a too-low balance or unbalanced shares leaves the need open with a clear error."""
+    project = require_owner(project_id, user)
+    need = need_row(project["id"], need_id)
+    if need["status"] != "open":
+        raise HTTPException(409, "This need is already filled")
     sb = service_client()
-    needs = sb.table("project_needs").select("*").eq("id", need_id).eq("project_id", project_id).execute().data
-    if not needs:
-        raise HTTPException(404, "Need not found")
-
-    sb.table("project_needs").update({"status": "filled"}).eq("id", need_id).execute()
+    ledger = sb.table("tolken_ledger").select("*").eq("need_id", need_id) \
+        .in_("status", ["pending_funding", "funded"]).execute().data
+    contributor = need.get("submitted_by") or next((e["contributor_id"] for e in ledger if e.get("contributor_id")), None)
+    if not contributor:
+        raise HTTPException(409, "Nobody has submitted work for this need yet")
 
     from ..services import tolken_service
-    ledger = sb.table("tolken_ledger").select("*").eq("need_id", need_id).in_("status", ["funded", "pending_funding"]).execute().data
     for entry in ledger:
-        try:
-            if entry["status"] == "pending_funding":
-                funded_entry = tolken_service.fund(entry)
-                tolken_service.release(funded_entry)
-            elif entry["status"] == "funded":
-                tolken_service.release(entry)
-        except Exception:
-            pass
-
-    return fresh_detail(project_id, user["id"])
-
+        tolken_service.release(tolken_service.fund(entry) if entry["status"] == "pending_funding" else entry)
+    sb.table("project_needs").update(completion(contributor)).eq("id", need_id).execute()
+    return fresh_detail(project["id"], user["id"])

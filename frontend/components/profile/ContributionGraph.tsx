@@ -41,7 +41,7 @@ export function ContributionGraph({ handle }: { handle: string }) {
   return (
     <section>
       <div className="mb-2.5 flex items-center justify-between">
-        <Label>{total === 0 ? "No activity this year yet" : `${total} ${total === 1 ? "contribution" : "contributions"} this year`}</Label>
+        <Label>{total === 0 ? "No completed tasks this year yet" : `${total} ${total === 1 ? "contribution" : "contributions"} this year`}</Label>
         <div className="flex items-center gap-1 text-xs text-muted-ink" aria-hidden>
           Less
           {levels.map((c) => (

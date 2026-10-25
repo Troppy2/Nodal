@@ -63,6 +63,8 @@ class NeedOut(BaseModel):
     fitters: list[ProfileLite] = []      # people who offer this skill, owner excluded, viewer first
     viewer_fits: bool = False
     viewer_requested: bool = False
+    submitted_by: ProfileLite | None = None   # team member who submitted work, waiting on the owner
+    completed_by: ProfileLite | None = None   # who finished it; counts on their contribution graph
 
 
 class ProjectCard(BaseModel):

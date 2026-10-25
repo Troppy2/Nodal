@@ -122,6 +122,27 @@ def test_collab_accept_creates_ledger(client, new_user):
     sb.table("tolken_ledger").delete().eq("project_id", p["id"]).execute()  # lets the fixture delete both users
 
 
+def test_completed_need_counts_as_contribution(client, new_user):
+    a, b, c = new_user(), new_user(), new_user()
+    sid = skill_id(client, "Sound design")
+    p = make_project(client, a, needs=[{"skill_id": sid}])
+    need = p["needs"][0]["id"]
+    submit, confirm = (f"{P}/projects/{p['id']}/needs/{need}/{step}" for step in ("submit-work", "confirm-work"))
+
+    assert client.post(submit, headers=c["headers"]).status_code == 403          # not on the team
+    assert client.post(confirm, headers=a["headers"]).status_code == 409          # nothing submitted yet
+    req = client.post(f"{P}/projects/{p['id']}/collab-requests", json={"skill_id": sid}, headers=b["headers"]).json()
+    client.post(f"{P}/collab-requests/{req['id']}/respond", json={"status": "accepted"}, headers=a["headers"])
+    r = client.post(submit, headers=b["headers"])
+    assert r.status_code == 200 and r.json()["needs"][0]["submitted_by"]["id"] == b["id"]
+    assert client.post(confirm, headers=b["headers"]).status_code == 403          # only the owner confirms
+    r = client.post(confirm, headers=a["headers"])
+    assert r.status_code == 200 and r.json()["needs"][0]["completed_by"]["id"] == b["id"]
+
+    handle = client.get(f"{P}/me", headers=b["headers"]).json()["profile"]["handle"]
+    assert sum(d["count"] for d in client.get(f"{P}/profiles/{handle}/activity").json()) == 1
+
+
 def test_onboarding(client, new_user):
     u = new_user()
     me = client.get(f"{P}/me", headers=u["headers"]).json()
@@ -143,7 +164,8 @@ def test_profile_and_activity(client):
     assert maya["profile"]["handle"] == "maya" and maya["offers"] and maya["projects"]
     assert set(maya["stats"]) == {"projects", "stars", "collaborations", "followers"}
     days = client.get(f"{P}/profiles/maya/activity").json()
-    assert days and {"date", "count"} == set(days[0])
+    # contributions are completed needs, so a profile may have none
+    assert isinstance(days, list) and all({"date", "count"} == set(d) for d in days)
     assert client.get(f"{P}/profiles/nobody-here").status_code == 404
 
 

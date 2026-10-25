@@ -132,7 +132,7 @@ def _load() -> World:
         lambda: select_all(t("skills").select("*").order("id")),
         lambda: select_all(t("profiles").select(PROFILE_COLS).order("id")),
         lambda: select_all(t("projects").select(PROJECT_COLS).order("id")),
-        lambda: select_all(t("project_needs").select("id,project_id,skill_id,note,bounty_tolken,status").order("id")),
+        lambda: select_all(t("project_needs").select("id,project_id,skill_id,note,bounty_tolken,status,submitted_by,completed_by").order("id")),
         lambda: select_all(t("profile_offers").select("profile_id,skill_id,level").eq("available", True)
                            .order("profile_id").order("skill_id")),
         lambda: select_all(t("project_tags").select("project_id,tag").order("project_id").order("tag")),

@@ -42,7 +42,13 @@ def _need(w: World, project: dict, n: dict, viewer_id: str | None) -> dict:
         "fitters": [profile_lite(w.profiles[i]) for i in fitters[:FITTERS_SHOWN]],
         "viewer_fits": viewer_id is not None and viewer_id != project["owner_id"] and viewer_id in fitters,
         "viewer_requested": (project["id"], n["skill_id"]) in w.requested.get(viewer_id, ()),
+        "submitted_by": _person(w, n.get("submitted_by")),
+        "completed_by": _person(w, n.get("completed_by")),
     }
+
+
+def _person(w: World, profile_id: str | None) -> dict | None:
+    return profile_lite(w.profiles[profile_id]) if profile_id in w.profiles else None
 
 
 def card(w: World, project_id: str, viewer_id: str | None = None) -> dict:

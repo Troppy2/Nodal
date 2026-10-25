@@ -39,6 +39,8 @@ export interface NeedOut {
   fitters: ProfileLite[];
   viewer_fits: boolean;
   viewer_requested: boolean;
+  submitted_by: ProfileLite | null;
+  completed_by: ProfileLite | null;
 }
 
 export interface ProjectCard {

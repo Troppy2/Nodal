@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ..db import parallel, service_client
+from ..db import service_client
 from ..deps import get_optional_user
 from ..models import ActivityDay, ProfileOut
 from ..services.cards import cards, profile_lite, skill_out
@@ -51,19 +51,11 @@ def get_profile(handle: str, viewer: dict | None = Depends(get_optional_user)):
 
 @router.get("/profiles/{handle}/activity", response_model=list[ActivityDay])
 def activity(handle: str, weeks: int = Query(52, ge=1, le=53)):
-    """Contributions per day: projects started, comments, requests to help, and teams joined."""
+    """Contributions per day: needs this person completed, dated by when the owner confirmed them
+    (with or without a Tolken bounty)."""
     pid = _profile_id(world(), handle)
     since = (datetime.now(timezone.utc) - timedelta(weeks=weeks)).isoformat()
-    t = service_client().table
-
-    def created(table: str, column: str, **eq):
-        q = t(table).select("created_at").eq(column, pid).gte("created_at", since)
-        for k, v in eq.items():
-            q = q.eq(k, v)
-        return lambda: q.execute().data
-
-    groups = parallel(created("projects", "owner_id"), created("comments", "author_id"),
-                      created("collab_requests", "from_profile_id"),
-                      created("project_members", "profile_id", role="contributor", status="joined"))
-    days = Counter(r["created_at"][:10] for rows in groups for r in rows)
+    rows = (service_client().table("project_needs").select("completed_at")
+            .eq("completed_by", pid).gte("completed_at", since).execute().data)
+    days = Counter(r["completed_at"][:10] for r in rows)
     return [{"date": d, "count": c} for d, c in sorted(days.items())]

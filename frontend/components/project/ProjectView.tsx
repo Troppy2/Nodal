@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { Award, Check, Loader2, Pencil, Plus, Rocket, Share2, Star, Trash2, X } from "lucide-react";
+import { Award, Check, Loader2, PartyPopper, Pencil, Plus, Rocket, Share2, Star, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar } from "@/components/Avatar";
 import { CollabButton } from "@/components/CollabDialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { CoverArt } from "@/components/feed/CoverArt";
 import { SkillPicker } from "@/components/forms/SkillPicker";
 import { ImageUploader } from "@/components/forms/ImageUploader";
@@ -182,7 +183,7 @@ function Loaded({
         body: { stage: "shipped" },
       });
       mutate(() => updated);
-      toast.success("Congratulations! Project marked as Shipped! 🎉");
+      toast.success("Project marked as shipped", { icon: <PartyPopper className="size-4" /> });
       invalidate("/feed", "/projects", "/profiles/");
     } catch (e) {
       toast.error((e as Error).message);
@@ -556,6 +557,7 @@ function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner:
   const [editingNeed, setEditingNeed] = useState<NeedOut | null>(null);
   const [busyNeed, setBusyNeed] = useState<string | null>(null);
   const [actingWork, setActingWork] = useState<string | null>(null);
+  const [pending, setPending] = useState<{ kind: "confirm" | "delete"; need: NeedOut } | null>(null);
 
   const pendingRequests = collabReqs.data?.filter((r) => r.status === "pending") ?? [];
   const onTeam = Boolean(me && project.members.some((m) => m.profile.id === me.profile.id));
@@ -576,7 +578,7 @@ function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner:
     setActingWork(need.id);
     try {
       await api(`/projects/${project.id}/needs/${need.id}/submit-work`, { method: "POST" });
-      toast.success("Work submitted for review! Owner notified.");
+      toast.success("Work submitted for review");
       invalidate(`/projects/${project.id}`);
       onReload();
     } catch (e) {
@@ -587,11 +589,10 @@ function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner:
   }
 
   async function confirmWork(need: NeedOut) {
-    if (!confirm(`Confirm work completed for ${need.skill.name}? This will mark the task finished and release any funded Tolken bounty.`)) return;
     setActingWork(need.id);
     try {
       await api(`/projects/${project.id}/needs/${need.id}/confirm-work`, { method: "POST" });
-      toast.success("🎉 Work confirmed & bounty released!");
+      toast.success(need.bounty_tolken ? "Work confirmed and bounty released" : "Work confirmed", { icon: <PartyPopper className="size-4" /> });
       invalidate(`/projects/${project.id}`, "/me/tolken", "/me");
       onReload();
     } catch (e) {
@@ -657,7 +658,6 @@ function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner:
   }
 
   async function deleteNeed(need: NeedOut) {
-    if (!confirm(`Remove ${need.skill.name} from project needs?`)) return;
     setBusyNeed(need.id);
     try {
       await api(`/projects/${project.id}/needs/${need.id}`, { method: "DELETE" });
@@ -757,8 +757,17 @@ function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner:
                         {formatTolken(n.bounty_tolken)} bounty
                       </span>
                     )}
-                    {n.status === "filled" && <span className="rounded bg-sunken px-1.5 py-0.5 text-xs font-medium text-muted-ink">Filled</span>}
-                    
+                    {n.status === "filled" && (
+                      <span className="rounded bg-sunken px-1.5 py-0.5 text-xs font-medium text-muted-ink">
+                        {n.completed_by ? `Done by ${n.completed_by.display_name || n.completed_by.handle}` : "Filled"}
+                      </span>
+                    )}
+                    {n.status === "open" && n.submitted_by && (
+                      <span className="rounded bg-teal-tint px-1.5 py-0.5 text-xs font-medium text-teal">
+                        Submitted by {n.submitted_by.display_name || n.submitted_by.handle}
+                      </span>
+                    )}
+
                     {n.viewer_fits && n.status === "open" && <span className="text-xs text-teal">You fit</span>}
                   </p>
                   {n.note && <p className="mt-0.5 text-sm text-muted-ink">{n.note}</p>}
@@ -795,14 +804,14 @@ function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner:
                         )
                       ) : null}
 
-                      {entry?.status === "funded" && n.status === "open" && (
+                      {n.status === "open" && n.submitted_by && (
                         <button
-                          onClick={() => confirmWork(n)}
+                          onClick={() => setPending({ kind: "confirm", need: n })}
                           disabled={actingWork === n.id}
                           className={cn(btn.match, "h-8 px-3 text-xs")}
                         >
                           {actingWork === n.id && <Loader2 className="size-3.5 animate-spin mr-1" />}
-                          Confirm Work & Release
+                          {n.bounty_tolken ? "Confirm work and release" : "Confirm work"}
                         </button>
                       )}
 
@@ -818,7 +827,7 @@ function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner:
                       <button onClick={() => setEditingNeed(n)} className={cn(btn.ghost, "h-8 px-2 text-xs")} title="Edit need">
                         <Pencil className="size-3.5" />
                       </button>
-                      <button onClick={() => deleteNeed(n)} disabled={busyNeed === n.id} className={cn(btn.ghost, "h-8 px-2 text-xs text-cool hover:bg-cool/10")} title="Delete need">
+                      <button onClick={() => setPending({ kind: "delete", need: n })} disabled={busyNeed === n.id} className={cn(btn.ghost, "h-8 px-2 text-xs text-cool hover:bg-cool/10")} title="Delete need">
                         <Trash2 className="size-3.5" />
                       </button>
                     </>
@@ -827,14 +836,14 @@ function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner:
                       {n.status === "open" && (
                         <CollabButton project={project} skillId={n.skill.id} label="Offer" className="w-full sm:w-auto" />
                       )}
-                      {onTeam && n.status === "open" && (
+                      {onTeam && n.status === "open" && !n.submitted_by && (
                         <button
                           onClick={() => submitWork(n)}
                           disabled={actingWork === n.id}
                           className={cn(btn.primary, "h-8 px-3 text-xs")}
                         >
                           {actingWork === n.id && <Loader2 className="size-3.5 animate-spin mr-1" />}
-                          Submit Work
+                          Submit work
                         </button>
                       )}
 
@@ -872,6 +881,25 @@ function NeedsTab({ project, owner, onReload }: { project: ProjectDetail; owner:
           }}
         />
       )}
+
+      <ConfirmDialog
+        open={Boolean(pending)}
+        title={pending?.kind === "delete" ? "Remove need?" : "Confirm work?"}
+        description={
+          pending?.kind === "delete"
+            ? `Remove ${pending.need.skill.name} from project needs? Any funded bounty returns to your Tolken balance.`
+            : `Confirm ${pending?.need.submitted_by?.display_name || pending?.need.submitted_by?.handle} finished ${pending?.need.skill.name}? The need is marked done and counts on their contributions.${pending?.need.bounty_tolken ? " The Tolken bounty is paid out." : ""}`
+        }
+        confirmLabel={pending?.kind === "delete" ? "Remove need" : "Confirm work"}
+        destructive={pending?.kind === "delete"}
+        busy={Boolean(pending && (busyNeed === pending.need.id || actingWork === pending.need.id))}
+        onCancel={() => setPending(null)}
+        onConfirm={async () => {
+          if (!pending) return;
+          await (pending.kind === "delete" ? deleteNeed(pending.need) : confirmWork(pending.need));
+          setPending(null);
+        }}
+      />
     </div>
   );
 }
