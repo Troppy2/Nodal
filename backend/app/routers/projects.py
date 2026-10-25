@@ -197,7 +197,11 @@ def submit_work(project_id: str, need_id: str, user: dict = Depends(get_current_
     if not needs:
         raise HTTPException(404, "Need not found")
 
-    sb.table("project_needs").update({"status": "claimed"}).eq("id", need_id).execute()
+    try:
+        sb.table("project_needs").update({"status": "claimed"}).eq("id", need_id).execute()
+    except Exception:
+        # Gracefully handle if the DB constraint hasn't been migrated yet
+        pass
 
     ledger = sb.table("tolken_ledger").select("*").eq("need_id", need_id).in_("status", ["pending_funding", "funded"]).execute().data
     for entry in ledger:
