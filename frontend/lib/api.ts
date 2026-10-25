@@ -2,7 +2,7 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8010/api/v1";
 
 let client: SupabaseClient | null = null;
 
@@ -23,17 +23,18 @@ export class ApiError extends Error {
   }
 }
 
-/** Calls the FastAPI backend with the viewer's token when signed in. Errors carry the API's `detail`. */
+/** Calls the FastAPI backend with the viewer's token when signed in. Supports JSON or FormData (for file uploads). */
 export async function api<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
   const { data } = await supabase().auth.getSession();
   const token = data.session?.access_token;
+  const isForm = typeof FormData !== "undefined" && init.body instanceof FormData;
   const res = await fetch(`${API_URL}${path}`, {
-    method: init.method ?? "GET",
+    method: init.method ?? (init.body !== undefined ? "POST" : "GET"),
     headers: {
-      ...(init.body !== undefined ? { "Content-Type": "application/json" } : {}),
+      ...(init.body !== undefined && !isForm ? { "Content-Type": "application/json" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+    body: isForm ? (init.body as FormData) : init.body !== undefined ? JSON.stringify(init.body) : undefined,
   });
   if (!res.ok) {
     let detail = `Request failed (${res.status})`;

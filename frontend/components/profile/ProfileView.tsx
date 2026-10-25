@@ -20,6 +20,7 @@ import { invalidate, useApi } from "@/lib/use-api";
 import { ContributionGraph } from "./ContributionGraph";
 import { OfferEditor } from "./OfferEditor";
 import { TolkenPanel } from "./TolkenPanel";
+import { ImageUploader } from "@/components/forms/ImageUploader";
 
 type Tab = "projects" | "ideas" | "tolken";
 
@@ -295,28 +296,13 @@ function NameBio({ profile, onSaved }: { profile: ProfileOut; onSaved: (me: MeOu
     );
 
   return (
-    <form onSubmit={save} className="flex max-w-lg flex-col gap-2">
-      <div>
-        <label htmlFor="avatar-url" className="mb-1 block text-xs font-semibold text-muted-ink">
-          Profile Picture URL
-        </label>
-        <div className="flex items-center gap-3">
-          {avatarUrl.trim() ? (
-            <img src={avatarUrl.trim()} alt="Avatar preview" className="size-10 rounded-full object-cover border border-line" />
-          ) : (
-            <div className="size-10 rounded-full bg-sunken flex items-center justify-center text-xs font-bold text-muted-ink border border-line">
-              {(name || profile.profile.handle).slice(0, 2).toUpperCase()}
-            </div>
-          )}
-          <input
-            id="avatar-url"
-            value={avatarUrl}
-            onChange={(e) => setAvatarUrl(e.target.value)}
-            placeholder="https://example.com/avatar.jpg"
-            className="h-10 flex-1 rounded-lg border border-line px-3 text-sm outline-none focus:border-ink"
-          />
-        </div>
-      </div>
+    <form onSubmit={save} className="flex max-w-lg flex-col gap-3">
+      <ImageUploader
+        label="Profile picture"
+        shape="square"
+        value={avatarUrl || null}
+        onChange={(url) => setAvatarUrl(url || "")}
+      />
       <label htmlFor="name" className="sr-only">
         Name
       </label>

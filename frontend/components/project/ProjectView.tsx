@@ -9,6 +9,7 @@ import { Avatar } from "@/components/Avatar";
 import { CollabButton } from "@/components/CollabDialog";
 import { CoverArt } from "@/components/feed/CoverArt";
 import { SkillPicker } from "@/components/forms/SkillPicker";
+import { ImageUploader } from "@/components/forms/ImageUploader";
 import { Label, ProjectMeta } from "@/components/Meta";
 import { MobileHeader } from "@/components/shell/MobileHeader";
 import { TabStrip } from "@/components/Tabs";
@@ -435,25 +436,12 @@ function EditProjectDialog({
             />
           </div>
 
-          <div>
-            <label htmlFor="edit-cover" className="mb-1 block text-xs font-semibold">
-              Cover Image URL <span className="font-normal text-muted-ink">(optional)</span>
-            </label>
-            <input
-              id="edit-cover"
-              type="url"
-              placeholder="https://images.unsplash.com/..."
-              value={coverUrl}
-              onChange={(e) => setCoverUrl(e.target.value)}
-              className={cn(inputClass, "h-10")}
-            />
-            {coverUrl.trim() && (
-              <div className="mt-2 h-24 overflow-hidden rounded-md border border-line">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={coverUrl} alt="Cover preview" className="size-full object-cover" />
-              </div>
-            )}
-          </div>
+          <ImageUploader
+            label="Cover Image (optional)"
+            value={coverUrl || null}
+            onChange={(url) => setCoverUrl(url || "")}
+            shape="banner"
+          />
 
           <div>
             <label htmlFor="edit-readme" className="mb-1 block text-xs font-semibold">

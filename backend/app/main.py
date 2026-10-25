@@ -9,7 +9,7 @@ from .config import settings
 from .limits import limiter
 from .routers import (
     auth, collab, comments, feed, graph, ideas, inbox, matches, me, messages, notifications, profiles, projects, recommendations,
-    research, skills, social, source, team, tolken,
+    research, skills, social, source, team, tolken, upload,
 )
 from .slugs import SlugMiddleware
 from .world import invalidate
@@ -70,6 +70,6 @@ def health():
 
 for module in (
     auth, projects, skills, comments, collab, social, profiles, me, source,
-    matches, graph, feed, recommendations, ideas, inbox, messages, team, tolken, research, notifications,
+    matches, graph, feed, recommendations, ideas, inbox, messages, team, tolken, research, notifications, upload,
 ):
     app.include_router(module.router, prefix="/api/v1")

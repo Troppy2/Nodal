@@ -16,6 +16,7 @@ import { btn } from "@/lib/styles";
 import { invalidate } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 import { SkillPicker } from "./SkillPicker";
+import { ImageUploader } from "./ImageUploader";
 
 const types: ProjectType[] = ["software", "hardware", "creative"];
 const input =
@@ -218,24 +219,12 @@ export function PostForm() {
           </div>
 
           
-          <div>
-            <label htmlFor="cover-url" className="mb-2 block text-sm font-semibold">
-              Cover image URL <span className="text-xs font-normal text-muted-ink">(optional)</span>
-            </label>
-            <input
-              id="cover-url"
-              value={coverUrl}
-              onChange={(e) => setCoverUrl(e.target.value)}
-              placeholder="https://images.unsplash.com/... or any image URL"
-              className={cn(input, "h-11 border-line")}
-            />
-            {coverUrl.trim() && (
-              <div className="mt-2.5 h-32 overflow-hidden rounded-lg border border-line relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={coverUrl.trim()} alt="Cover preview" className="h-full w-full object-cover" />
-              </div>
-            )}
-          </div>
+          <ImageUploader
+            value={coverUrl || null}
+            onChange={(url) => setCoverUrl(url || "")}
+            label="Cover image (optional)"
+            shape="banner"
+          />
 
           <div>
             <label htmlFor="title" className="mb-2 block text-sm font-semibold">
