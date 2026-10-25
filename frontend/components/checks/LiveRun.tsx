@@ -16,8 +16,12 @@ function elapsedLabel(start: string, tick: number) {
 }
 
 function phaseOf(run: ResearchOut, check: "market" | "cool") {
-  // Findings arrive between phases; only the step events say what the run is doing.
-  const labels = run.steps.filter((s) => s.kind !== "fact").map((s) => s.label);
+  // Both checks share one event log, so pick out the steps that belong to this check. Findings
+  // arrive between phases and say nothing about what the run is doing.
+  const labels = run.steps
+    .filter((s) => s.kind !== "fact")
+    .map((s) => s.label)
+    .filter((l) => (check === "cool" ? l.startsWith("Looking around") || l.startsWith("Scoring") : !l.startsWith("Looking around") && !l.startsWith("Scoring")));
   const last = labels[labels.length - 1] ?? "";
   if (last.startsWith("Writing report")) return "Writing the report";
   if (last.startsWith("Found ") || last.startsWith("Extracting")) return "Reading sources";
@@ -75,7 +79,10 @@ export function CheckSkeleton({ check }: { check: "market" | "cool" }) {
 export function LiveRun({ run, check }: { run: ResearchOut; check: "market" | "cool" }) {
   const [tick, setTick] = useState(() => Date.now());
   const list = useRef<HTMLOListElement>(null);
-  const steps = run.steps;
+  // Both checks log into the same run, so this panel only shows its own events.
+  const steps = check === "cool"
+    ? run.steps.filter((s) => s.label.startsWith("Looking around") || s.label.startsWith("Scoring"))
+    : run.steps.filter((s) => !s.label.startsWith("Looking around") && !s.label.startsWith("Scoring"));
   const facts = steps.filter((s) => s.kind === "fact").length;
   // A run can log 30+ events; keep the newest ones and say how many scrolled off.
   const tail = steps.slice(-12);
@@ -127,7 +134,7 @@ export function LiveRun({ run, check }: { run: ResearchOut; check: "market" | "c
                 {hidden} earlier {hidden === 1 ? "event" : "events"}
               </p>
             )}
-            <ol ref={list} className="mt-2 flex max-h-[228px] flex-col gap-2 overflow-y-auto pr-1">
+            <ol ref={list} className="mt-2 flex max-h-[52vh] flex-col gap-2 overflow-y-auto pr-1 sm:max-h-[228px]">
               {tail.map((s, j) => {
                 const isFact = s.kind === "fact";
                 const isLatest = j === tail.length - 1;
@@ -167,7 +174,7 @@ export function LiveRun({ run, check }: { run: ResearchOut; check: "market" | "c
 
       <p className="mt-3 text-[13px] text-muted-ink">
         {check === "market"
-          ? "Writing a cited report from these findings. This takes about 15–30 seconds."
+          ? "Hunting down sources and writing a cited report. Usually under a minute."
           : "Scoring the idea. A few seconds."}
       </p>
     </div>
