@@ -26,7 +26,7 @@ function CycleRow({ cycle, meId }: { cycle: Cycle; meId: string }) {
     try {
       await api("/cycles/invite", { method: "POST", body: { cycle_id: cycle.id } });
       setState("sent");
-      invalidate("/me/inbox");
+      invalidate("/me/inbox", "/me/cycles");
       toast.success(cycle.kind === "swap" ? `Swap invite sent to ${partner.display_name || partner.handle}` : "Ring invite sent");
     } catch (e) {
       setState("idle");
@@ -34,24 +34,31 @@ function CycleRow({ cycle, meId }: { cycle: Cycle; meId: string }) {
     }
   }
 
+  const partnerNames = others.map((o) => (o.display_name || o.handle).split(" ")[0]).join(" & ");
+
   return (
     <li className="flex items-center gap-2.5">
       <Link href={`/u/${partner.handle}`} className="shrink-0 rounded-full">
-        <Avatar person={partner} size={32} />
+        <Avatar person={partner} size={32} ring={cycle.kind === "ring"} />
       </Link>
       <div className="min-w-0 flex-1 leading-snug">
-        <p className="flex items-baseline justify-between gap-2 text-[13px] font-semibold">
-          <span className="truncate">{others.map((o) => (o.display_name || o.handle).split(" ")[0]).join(" & ")}</span>
-          <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-teal">
-            {cycle.kind === "swap" ? "Swap" : "Ring"}
+        <div className="flex items-baseline gap-1.5 min-w-0">
+          <Link
+            href={`/u/${partner.handle}`}
+            className="truncate text-[13px] font-semibold text-ink hover:underline"
+          >
+            {partnerNames}
+          </Link>
+          <span className="shrink-0 text-[11px] text-muted-ink">
+            · {cycle.kind === "swap" ? "Swap" : "Ring"}
           </span>
-        </p>
+        </div>
         {iGive && iGet && (
           <p className="mt-0.5 flex flex-col gap-0.5 text-xs leading-snug text-muted-ink">
-            <span>
+            <span className="truncate">
               Give <span className="text-ink">{iGive}</span>
             </span>
-            <span>
+            <span className="truncate">
               Get <span className="text-ink">{iGet}</span>
             </span>
           </p>
@@ -138,8 +145,8 @@ export function SideSuggestions() {
           <div className="mb-2.5 flex items-baseline justify-between">
             <Label>Swaps ready for you</Label>
             {cycleList.length > 0 && (
-              <Link href="/inbox" className="text-xs font-semibold text-muted-ink hover:text-ink">
-                Inbox
+              <Link href="/requests" className="text-xs font-semibold text-muted-ink hover:text-ink">
+                All Requests
               </Link>
             )}
           </div>

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from ..db import parallel, service_client
 from ..deps import get_current_user
 from ..models import CycleInviteIn, CustomSwapIn, InboxItem, InviteRespondIn
-from ..services.cards import profile_lite
+from ..services.cards import profile_lite, skill_out
 from ..services.graph import link_json
 from ..world import world
 from .collab import collab_out, requests_involving
@@ -28,6 +28,34 @@ def _collab_items(me: str, rows: list[dict]) -> list[dict]:
     return out
 
 
+def _normalize_links(w, links: list[dict]) -> list[dict]:
+    out = []
+    for link in links:
+        if not isinstance(link, dict):
+            continue
+        l = dict(link)
+        skill_val = l.get("skill")
+        if not isinstance(skill_val, dict) or not skill_val.get("name"):
+            sid = l.get("skill_id")
+            if not sid and isinstance(skill_val, dict):
+                sid = skill_val.get("id")
+            try:
+                sid = int(sid) if sid is not None else None
+            except (ValueError, TypeError):
+                sid = None
+            if sid is not None and sid in w.skills:
+                l["skill"] = skill_out(w.skills[sid])
+            else:
+                l["skill"] = {
+                    "id": sid or 0,
+                    "name": (skill_val.get("name") if isinstance(skill_val, dict) else None) or l.get("skill_name", "Skill"),
+                    "slug": (skill_val.get("slug") if isinstance(skill_val, dict) else None) or "skill",
+                    "category": (skill_val.get("category") if isinstance(skill_val, dict) else None) or "software",
+                }
+        out.append(l)
+    return out
+
+
 def _invite_items(me: str, only: str | None = None) -> list[dict]:
     t = service_client().table
     q = t("cycle_invite_members").select("invite_id").eq("profile_id", me)
@@ -46,7 +74,7 @@ def _invite_items(me: str, only: str | None = None) -> list[dict]:
             "id": inv["id"], "kind": inv["kind"], "direction": "outgoing" if inv["created_by"] == me else "incoming",
             "created_at": inv["created_at"],
             "people": [profile_lite(people[p]) for p in responses if p != me and p in people],
-            "links": inv["links"], "responses": responses, "status": inv["status"],
+            "links": _normalize_links(world(), inv.get("links") or []), "responses": responses, "status": inv["status"],
             "actions": ACTIONS if inv["status"] == "pending" and responses.get(me) == "pending" else [],
         })
     return out
@@ -94,7 +122,7 @@ def respond(invite_id: str, body: InviteRespondIn, user: dict = Depends(get_curr
         # conditional on pending: if two last responses race, only one of them adds the members
         done = t("cycle_invites").update({"status": "accepted"}).eq("id", invite_id).eq("status", "pending").execute().data
         if done:
-            links = done[0]["links"]
+            links = _normalize_links(world(), done[0].get("links") or [])
             joined = parallel(*[
                 (lambda link=link: t("project_members").select("role").eq("project_id", link["project_id"])
                  .eq("profile_id", link["from"]).execute().data) for link in links])
@@ -112,30 +140,53 @@ def custom_swap(body: CustomSwapIn, user: dict = Depends(get_current_user)):
     t = service_client().table
     w = world()
 
-    my_proj = t("projects").select("id,owner_id,title").eq("id", body.my_project_id).execute().data
-    their_proj = t("projects").select("id,owner_id,title").eq("id", body.their_project_id).execute().data
-    if not my_proj or my_proj[0]["owner_id"] != me:
+    def _resolve(ref: str) -> dict | None:
+        ref = ref.strip()
+        # 1. World check by id or slug
+        pid = w.project_id(ref)
+        if pid and pid in w.projects:
+            proj = w.projects[pid]
+            return {"id": proj["id"], "owner_id": proj["owner_id"], "title": proj["title"], "slug": proj.get("slug")}
+        # 2. Database check by id or slug
+        try:
+            res = t("projects").select("id,owner_id,title,slug").eq("id", ref).execute().data
+            if res:
+                return res[0]
+        except Exception:
+            pass
+        res = t("projects").select("id,owner_id,title,slug").eq("slug", ref).execute().data
+        if res:
+            return res[0]
+        return None
+
+    my_proj = _resolve(body.my_project_id)
+    their_proj = _resolve(body.their_project_id)
+    if not my_proj or my_proj["owner_id"] != me:
         raise HTTPException(403, "You do not own your specified project")
-    if not their_proj or their_proj[0]["owner_id"] != body.partner_id:
+    if not their_proj or their_proj["owner_id"] != body.partner_id:
         raise HTTPException(422, "Partner does not own the target project")
 
+    my_pid = my_proj["id"]
+    their_pid = their_proj["id"]
+
+    def pick(project_id: str, helper: str, requested: int | None, title: str) -> int:
+        """The requested skill if it is an open need of the project, else the open need the helper
+        offers at the highest level, else the first open need."""
+        open_needs = [n["skill_id"] for n in w.needs_by_project.get(project_id, []) if n["status"] == "open"]
+        if not open_needs:
+            raise HTTPException(422, f"{title} has no open needs to swap for")
+        if requested in open_needs:
+            return requested
+        offered = w.offers.get(helper, {})
+        return max(open_needs, key=lambda sid: offered.get(sid, 0))
+
+    my_skill = pick(their_pid, me, body.my_skill_id, their_proj["title"])               # what I do for them
+    their_skill = pick(my_pid, body.partner_id, body.their_skill_id, my_proj["title"])  # what they do for me
     links = [
-        {
-            "from": me,
-            "to": body.partner_id,
-            "project_id": body.their_project_id,
-            "skill_id": body.my_skill_id,
-            "project_title": their_proj[0]["title"],
-            "skill_name": w.skills.get(body.my_skill_id, {}).get("name", "Skill"),
-        },
-        {
-            "from": body.partner_id,
-            "to": me,
-            "project_id": body.my_project_id,
-            "skill_id": body.their_skill_id,
-            "project_title": my_proj[0]["title"],
-            "skill_name": w.skills.get(body.their_skill_id, {}).get("name", "Skill"),
-        },
+        {"from": me, "to": body.partner_id, "project_id": their_pid, "project_title": their_proj["title"],
+         "skill": skill_out(w.skills[my_skill])},
+        {"from": body.partner_id, "to": me, "project_id": my_pid, "project_title": my_proj["title"],
+         "skill": skill_out(w.skills[their_skill])},
     ]
 
     inv = t("cycle_invites").insert({

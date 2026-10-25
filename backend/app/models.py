@@ -3,7 +3,7 @@
 
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field, model_validator
 
 ProjectType = Literal["software", "hardware", "creative"]
 
@@ -38,8 +38,8 @@ class ProfileLite(BaseModel):
 class Skill(BaseModel):
     id: int
     name: str
-    slug: str
-    category: ProjectType
+    slug: str = ""
+    category: ProjectType = "software"
 
 
 class Offer(BaseModel):
@@ -69,6 +69,7 @@ class NeedOut(BaseModel):
 
 class ProjectCard(BaseModel):
     id: str
+    slug: str | None = None
     title: str
     summary: str
     type: ProjectType
@@ -107,6 +108,20 @@ class ProjectDetail(ProjectCard):
 class ProjectList(BaseModel):
     items: list[ProjectCard]
     next_page: int | None = None
+
+
+class MyProjectMembership(BaseModel):
+    role: Literal["owner", "contributor"]
+    status: Literal["invited", "joined"]
+    skill: Skill | None = None
+    share_bps: int | None = None
+
+
+class MyProjectsOut(BaseModel):
+    owned: list[ProjectCard]
+    contributing: list[ProjectCard]
+    all: list[ProjectCard]
+    memberships: dict[str, MyProjectMembership] = {}
 
 
 class NeedIn(BaseModel):
@@ -262,6 +277,26 @@ class CycleLink(BaseModel):
 
     model_config = {"populate_by_name": True}
 
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_skill(cls, data):
+        if isinstance(data, dict):
+            skill_val = data.get("skill")
+            if not isinstance(skill_val, dict) or not skill_val.get("name"):
+                data = dict(data)
+                sid = data.get("skill_id")
+                try:
+                    sid = int(sid) if sid is not None else 0
+                except (ValueError, TypeError):
+                    sid = 0
+                data["skill"] = {
+                    "id": sid,
+                    "name": data.get("skill_name") or "Skill",
+                    "slug": data.get("skill_slug") or "skill",
+                    "category": data.get("skill_category") or "software",
+                }
+        return data
+
 
 class Cycle(BaseModel):
     id: str
@@ -341,9 +376,9 @@ class InboxItem(BaseModel):
 class CustomSwapIn(BaseModel):
     partner_id: str
     my_project_id: str
-    my_skill_id: int
+    my_skill_id: int | None = None       # omitted: the open need I offer best
     their_project_id: str
-    their_skill_id: int
+    their_skill_id: int | None = None
     message: str | None = None
 
 class CycleInviteIn(BaseModel):

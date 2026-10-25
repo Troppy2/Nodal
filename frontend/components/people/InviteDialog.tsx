@@ -119,7 +119,7 @@ export function InviteDialog({
                 </span>
               )}
               <Link
-                href={`/inbox?thread=m:${person.id}`}
+                href={`/messages?thread=m:${person.id}`}
                 onClick={() => close(false)}
                 className={cn(btn.primary, "max-sm:flex-1")}
               >

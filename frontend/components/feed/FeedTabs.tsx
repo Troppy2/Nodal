@@ -14,7 +14,7 @@ import { useApi } from "@/lib/use-api";
 import { IntersectionList, NeedsYouList } from "./Intersections";
 import { PostCard, PostCardSkeleton } from "./PostCard";
 
-type Tab = "for_you" | "following" | "ideas";
+type Tab = "for_you" | "following" | "ideas" | "projects";
 type AnyTab = Tab | "needs_you" | "intersections";
 
 const empty: Record<Tab, { text: string; action: React.ReactNode }> = {
@@ -39,6 +39,14 @@ const empty: Record<Tab, { text: string; action: React.ReactNode }> = {
     action: (
       <Link href="/create" className={btn.primary}>
         Post an idea
+      </Link>
+    ),
+  },
+  projects: {
+    text: "No projects being built right now. Post what you're working on and find collaborators.",
+    action: (
+      <Link href="/create" className={btn.primary}>
+        Post a project
       </Link>
     ),
   },
@@ -116,6 +124,7 @@ export function FeedTabs() {
           { id: "needs_you", label: "Needs you" },
           { id: "intersections", label: "Intersections" },
           { id: "ideas", label: "Ideas" },
+          { id: "projects", label: "Projects" },
         ]}
         className="gap-5 px-4 lg:gap-7 lg:px-0"
       />

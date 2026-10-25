@@ -24,7 +24,7 @@ Click-by-click demo: [DEMO.md](DEMO.md). Feature choices: [DEMO_GUIDE.md](DEMO_G
 - **Cycle detection:**
   - Swaps are 2-person loops: I help you, you help me.
   - Rings are 3-person loops: A helps B, B helps C, C helps A.
-  - Cycles are ranked by score; the best show up on the graph and in the inbox.
+  - Cycles are ranked by score; the best show up on the graph and on the Requests page.
 - **The rest of the system, one line each:**
   - The research agent plans searches, reads pages, and writes a report where every claim cites a source.
   - The Tolken ledger takes a bounty from funded to paid, and the database won't let a balance go negative.

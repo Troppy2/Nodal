@@ -8,8 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from ..db import parallel, service_client, user_client
 from ..deps import get_current_user
 from ..handles import PLACEHOLDER_PREFIX, handle_taken, unique_handle
-from ..models import InterestsIn, MeIn, MeOut, OfferIn
-from ..services.cards import profile_lite
+from ..models import InterestsIn, MeIn, MeOut, MyProjectsOut, OfferIn
+from ..services.cards import cards, profile_lite, skill_out
 from ..world import world
 from .profiles import offers_out
 
@@ -80,3 +80,53 @@ def put_interests(body: InterestsIn, user: dict = Depends(get_current_user)):
     tags = list(dict.fromkeys(t for t in tags if t))
     user_client(user["jwt"]).table("profiles").update({"interests": tags}).eq("id", user["id"]).execute()
     return _me(user["id"])
+
+
+@router.get("/me/projects", response_model=MyProjectsOut)
+def get_my_projects(user: dict = Depends(get_current_user)):
+    """All projects the viewer is involved in: owned or contributing (joined as team member)."""
+    uid = user["id"]
+    w = world()
+    t = service_client().table
+
+    # Fetch live project memberships for user to ensure immediate accuracy
+    member_rows = t("project_members").select("project_id,role,status,skill_id,share_bps").eq("profile_id", uid).execute().data
+
+    # Owned projects (live from projects table for freshness)
+    owned_rows = t("projects").select("id").eq("owner_id", uid).order("created_at", desc=True).execute().data
+    owned_ids = [r["id"] for r in owned_rows]
+
+    # Contributing projects (joined members where user is contributor and not owner)
+    contributing_ids = [
+        m["project_id"] for m in member_rows
+        if m.get("role") == "contributor" and m.get("status") == "joined" and m["project_id"] not in owned_ids
+    ]
+
+    all_ids = owned_ids + [pid for pid in contributing_ids if pid not in owned_ids]
+
+    memberships = {}
+    for m in member_rows:
+        pid = m["project_id"]
+        sid = m.get("skill_id")
+        skill_data = skill_out(w.skills[sid]) if sid and sid in w.skills else None
+        memberships[pid] = {
+            "role": m.get("role") or "contributor",
+            "status": m.get("status") or "joined",
+            "share_bps": m.get("share_bps"),
+            "skill": skill_data,
+        }
+    for oid in owned_ids:
+        if oid not in memberships:
+            memberships[oid] = {
+                "role": "owner",
+                "status": "joined",
+                "share_bps": None,
+                "skill": None,
+            }
+
+    return {
+        "owned": cards(w, owned_ids, uid),
+        "contributing": cards(w, contributing_ids, uid),
+        "all": cards(w, all_ids, uid),
+        "memberships": memberships,
+    }

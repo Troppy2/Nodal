@@ -54,7 +54,7 @@ Each step has one place it starts and one thing on screen that shows it worked.
 
 ### 6. Rin's side (Window B, Rin)
 - **Start:** Home → **Needs you** tab.
-- **Do:** Singing Plant is there, tagged "Needs your Sound design". Then **Inbox** → **Messages** → Maya → **Accept Invite & Start Working**.
+- **Do:** Singing Plant is there, tagged "Needs your Sound design". Then **Messages** (sidebar) → Maya → **Accept Invite & Start Working**.
 - **End:** Toast "Joined Singing Plant! You're now on the team." and the card reads **Joined team!**
 
 ### 7. Fund the bounty (Window A, Maya)

@@ -45,6 +45,7 @@ export interface NeedOut {
 
 export interface ProjectCard {
   id: string;
+  slug?: string;
   title: string;
   summary: string;
   type: ProjectType;
@@ -320,4 +321,19 @@ export interface CustomSwapIn {
   their_project_id: string;
   their_skill_id: number;
   message?: string | null;
+}
+
+
+export interface MyProjectMembership {
+  role: "owner" | "contributor";
+  status: "invited" | "joined";
+  skill?: Skill | null;
+  share_bps?: number | null;
+}
+
+export interface MyProjectsOut {
+  owned: ProjectCard[];
+  contributing: ProjectCard[];
+  all: ProjectCard[];
+  memberships: Record<string, MyProjectMembership>;
 }

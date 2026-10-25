@@ -58,7 +58,7 @@ def card(w: World, project_id: str, viewer_id: str | None = None) -> dict:
     run = w.badge_run(project_id, viewer_id) if p["stage"] == "idea" else None   # checks are for ideas only
     stars = w.stars.get(project_id, set())
     return {
-        "id": project_id, "title": p["title"], "summary": p["summary"], "type": p["type"], "stage": p["stage"],
+        "id": project_id, "slug": p.get("slug") or project_id, "title": p["title"], "summary": p["summary"], "type": p["type"], "stage": p["stage"],
         "source_access": p["source_access"], "cover": cover_for(project_id, p["type"]), "cover_url": p.get("cover_url"),
         "owner": profile_lite(w.profiles[p["owner_id"]]), "tags": sorted(w.tags.get(project_id, ())),
         "needs": [_need(w, p, n, viewer_id) for n in rows],

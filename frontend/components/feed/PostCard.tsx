@@ -10,7 +10,7 @@ import { ProjectMeta } from "@/components/Meta";
 import { timeAgo } from "@/components/project/states";
 import { api } from "@/lib/api";
 import type { NeedOut, ProjectCard } from "@/lib/api-types";
-import { formatTolken } from "@/lib/cover";
+import { formatTolken, TOLKEN } from "@/lib/cover";
 import { useSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { CoverArt } from "./CoverArt";
@@ -76,6 +76,7 @@ export function PostCard({ project }: { project: ProjectCard }) {
   const fit = project.people_fit;
   const { market_verdict, cool_score } = project.badges;
   const needs = project.needs.filter((n) => n.status === "open");
+  const totalBounty = needs.reduce((sum, n) => sum + (n.bounty_tolken || 0), 0);
   const shownNeeds = needs.slice(0, 4);
 
   return (
@@ -131,7 +132,14 @@ export function PostCard({ project }: { project: ProjectCard }) {
       {needs.length > 0 && (
         <div className="border-t border-line px-4 py-3 lg:px-5">
           <div className="flex items-baseline justify-between gap-3">
-            <p className="text-[13px] font-semibold">Needs</p>
+            <div className="flex items-center gap-2">
+              <p className="text-[13px] font-semibold">Needs</p>
+              {totalBounty > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-teal-tint px-2 py-0.5 text-[11px] font-bold text-teal border border-teal/20">
+                  <span>{TOLKEN}</span> {totalBounty} bounty
+                </span>
+              )}
+            </div>
             {fit > 0 && (
               <p className="text-xs text-muted-ink">
                 {fit} {fit === 1 ? "person fits" : "people fit"}

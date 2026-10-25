@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { ChevronRight, Link2, Loader2, MessageCircle, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar } from "@/components/Avatar";
@@ -57,8 +57,16 @@ function ProfileSkeleton() {
 }
 
 function Profile({ handle }: { handle: string }) {
+  const searchParams = useSearchParams();
+  const queryTab = searchParams.get("tab");
   const profile = useApi<ProfileOut>(`/profiles/${encodeURIComponent(handle)}`);
-  const [tab, setTab] = useState<Tab>("projects");
+  const [tab, setTab] = useState<Tab>(queryTab === "tolken" ? "tolken" : queryTab === "ideas" ? "ideas" : "projects");
+
+  useEffect(() => {
+    if (queryTab === "tolken" || queryTab === "ideas" || queryTab === "projects") {
+      setTab(queryTab);
+    }
+  }, [queryTab]);
 
   if (profile.error) {
     const missing = profile.error instanceof ApiError && profile.error.status === 404;
@@ -108,7 +116,7 @@ function Profile({ handle }: { handle: string }) {
   ) : (
     <>
       <FollowButton profile={p} mutate={profile.mutate} />
-      <Link href={`/inbox?thread=m:${p.profile.id}`} className={btn.secondary}>
+      <Link href={`/messages?thread=m:${p.profile.id}`} className={btn.secondary}>
         <MessageCircle className="size-4" /> Message
       </Link>
     </>
@@ -435,8 +443,8 @@ function Cycles() {
             return (
               <li key={c.id}>
                 <Link
-                  href="/inbox"
-                  aria-label={`Open the ${c.kind} with ${others.join(" and ")} in your inbox`}
+                  href="/requests"
+                  aria-label={`Open the ${c.kind} with ${others.join(" and ")} in your requests`}
                   className="group -mx-3 flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-sunken focus-visible:outline-offset-[-3px]"
                 >
                   <span className="w-10 shrink-0 text-xs font-semibold text-teal">{c.kind === "swap" ? "Swap" : "Ring"}</span>

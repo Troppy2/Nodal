@@ -19,14 +19,16 @@ to say about each.
 | 2 | **Post an idea with needs** | Create | Usability | "Say what you're making and which skills you're missing. That's the only input matching needs." |
 | 3 | **Research agent** | Results → Market check, Cool factor | Technical complexity | "An agent plans searches, reads pages, extracts facts and writes a report where every claim cites a source." |
 | 4 | **People graph with swaps** | Results → graph | Innovation, technical complexity | "Rin fills our need, and we can fill one of hers. Nodal finds these cycles on the skill graph, including three-way rings." |
-| 5 | **Invite is a DM** | Invite to build → Inbox | Design | "No separate notification system. The invite is a message, and the follow-up happens in the same thread." |
+| 5 | **Invite is a DM** | Invite to build → Messages | Design | "No separate notification system. The invite is a message, and the follow-up happens in the same thread." |
 | 6 | **Needs you** | Rin: Home → Needs you | Prompt fit (both directions) | "The same match from the helper's side: projects that need what I offer." |
 | 7 | **Tolken bounty** | Needs → Fund, Submit, Confirm | Technical complexity, design | "An in-app currency, no money. Held when funded, paid when the owner confirms, and it counts on the helper's contribution graph." |
 | 8 | **Profile payoff** | Rin → Profile | Design | "Proof of work: completed tasks and Tolken earned." |
 
 ## Show only if asked
 
-- **Trades for you** (Inbox): the list of suggested swaps and rings, each showing what you give and what you get.
+- **Trades for you** (Requests page): suggested swaps and rings, each showing what you give and what you get.
+- **Custom swap** (Requests → + Custom Swap): search a person, pick your project and theirs; Nodal picks the skills each side offers.
+- **My Projects** page and the Tolken balance in the sidebar.
 - **Explore** search and filters.
 - **Source browser** on seeded projects that have code.
 
@@ -34,8 +36,7 @@ to say about each.
 
 | Feature | Why |
 |---|---|
-| Custom swap | Removed from the UI; the old form didn't work. |
-| Alerts tab | A second notification path; it competes with "invites are DMs". |
+| Alerts page | A second notification path; it competes with "invites are DMs". |
 | Idea suggestions | Backend only, no screen. |
 | Name-only sign-in details | Fine for a demo; don't invite security questions. |
 
