@@ -143,7 +143,7 @@ There are 49 backend tests. They create real Supabase users and clean up after t
 
 ## 10. Useful links
 
-- Demo script: [`DEMO.md`](DEMO.md)
+- Demo script: [`DEMO.md`](DEMO.md) · what to show and why: [`DEMO_GUIDE.md`](DEMO_GUIDE.md)
 - Run guide: [`RUNNING.md`](RUNNING.md)
 - Gap audit: [`FEATURE_GAPS.md`](FEATURE_GAPS.md)
 - Product/design: [`DESIGN.md`](DESIGN.md)
@@ -154,3 +154,4 @@ There are 49 backend tests. They create real Supabase users and clean up after t
 - 2026-10-24: Graph `fills` edges now keep each person's best-scoring skill (was the worst), so the graph and the match panel agree (Soil Choir / Rin). Sample market report fixture now fills `market_size` and `business_models`. Files: `backend/app/services/graph.py`, `backend/fixtures/research_report.json`. pytest -k graph/cycle/feed: 10 passed.
 - 2026-10-24: Demo flow made coherent end to end; script in `docs/DEMO.md`, rehearsal check `backend/scripts/demo_smoke.py`. Fixes: inbox tabs no longer hide Messages; invite cards show their own project and persist "Joined"; team members see "On the team" and Submit work instead of Join/Offer; project tab survives refetch (`?tab=`); results-page person panel and graph sized for the narrow column (6 people). Without the need_completion migration, submitted/completed state and the contribution graph now fall back to the Tolken ledger (bounty needs only). Full browser walkthrough maya to rin passed. tsc + lint clean; pytest 48 passed, 2 failed (both fail on the previous commit too: missing migration, and a leftover `%` profile).
 - 2026-10-24: Inbox swaps/rings reworked as "Trades for you": each row shows what you give and what you get, swaps listed before rings, one-line definition of swap vs ring, button says Propose. Removed the custom swap dialog from the UI (it asked for raw project IDs and always sent skill 1); `POST /cycles/custom-swap` still exists. Files: `frontend/components/inbox/InboxView.tsx`, `RingInviteCard.tsx`.
+- 2026-10-24: Added `docs/DEMO_GUIDE.md` (features to show, mapped to judging criteria) and a root `.gitignore` for `.playwright-mcp/`.
