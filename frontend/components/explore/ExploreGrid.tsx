@@ -110,7 +110,7 @@ export function ExploreGrid() {
         )}
       </label>
 
-      <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:px-0" role="group" aria-label="Filters">
+      <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:mx-0 lg:flex-wrap lg:px-0" role="group" aria-label="Filters">
         {filters
           .filter((x) => !x.signedInOnly || signedIn)
           .map((x) => {

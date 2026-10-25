@@ -88,7 +88,7 @@ function FilterToggle({
     { id: "messages", label: "Messages" },
   ];
   return (
-    <div className="flex w-full rounded-lg border border-line p-0.5 sm:w-auto overflow-x-auto" role="group" aria-label="Show">
+    <div className="flex w-full rounded-lg border border-line p-0.5 sm:w-auto overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Show">
       {filters.map(({ id, label }) => (
         <button
           key={id}

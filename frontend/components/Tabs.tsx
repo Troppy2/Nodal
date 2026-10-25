@@ -22,7 +22,7 @@ export function TabStrip<T extends string>({
   return (
     <div
       role="tablist"
-      className={cn("flex border-b border-line", fill ? "" : "gap-7 overflow-x-auto [scrollbar-width:none] [&>button]:shrink-0", className)}
+      className={cn("flex border-b border-line", fill ? "" : "gap-7 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>button]:shrink-0", className)}
     >
       {tabs.map((t) => (
         <button

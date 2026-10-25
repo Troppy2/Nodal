@@ -192,3 +192,23 @@ select:focus-visible {
     display: none;
   }
 }
+
+/* Hide scroll bars on tabs, filter strips, and horizontally scrollable navigation across all browsers */
+[role="tablist"],
+[role="radiogroup"],
+[role="group"],
+.no-scrollbar,
+[data-no-scrollbar] {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+[role="tablist"]::-webkit-scrollbar,
+[role="radiogroup"]::-webkit-scrollbar,
+[role="group"]::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar,
+[data-no-scrollbar]::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
