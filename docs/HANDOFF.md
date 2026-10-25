@@ -150,3 +150,4 @@ There are 49 backend tests. They create real Supabase users and clean up after t
 - Frontend spec: [`FRONTEND.md`](FRONTEND.md)
 - Env sync issue: [#5](https://github.com/Troppy2/Nodal/issues/5)
 - 2026-10-24: Feed gains **Needs you** (`/me/matches`) and **Intersections** (`/feed/intersections`) tabs (`frontend/components/feed/Intersections.tsx`, `FeedTabs.tsx`). Intersections endpoint now dedupes A/B pairs and returns `other: ProjectCard`. tsc + eslint clean; checked in browser as maya.
+- 2026-10-24: Graph `fills` edges now keep each person's best-scoring skill (was the worst), so the graph and the match panel agree (Soil Choir / Rin). Sample market report fixture now fills `market_size` and `business_models`. Files: `backend/app/services/graph.py`, `backend/fixtures/research_report.json`. pytest -k graph/cycle/feed: 10 passed.

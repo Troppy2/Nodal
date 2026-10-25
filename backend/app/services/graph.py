@@ -44,7 +44,10 @@ def project_graph(w: World, project_id: str, depth: int) -> dict:
 
     def add_fill(e: Edge, d: int):
         nodes.setdefault(e.frm, {"id": e.frm, "kind": "profile", "label": e.frm, "depth": d})
-        edges[("fills", e.frm, e.project_id)] = {"source": e.frm, "target": e.project_id, "kind": "fills",
+        key = ("fills", e.frm, e.project_id)
+        if key in edges and edges[key]["_score"] >= e.score:
+            return      # one edge per person and project: keep the best skill, as matching does
+        edges[key] = {"source": e.frm, "target": e.project_id, "kind": "fills",
                                                 "skill": w.skills[e.skill_id]["name"], "_score": e.score}
 
     add_project(project_id, 0)

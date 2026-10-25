@@ -34,8 +34,34 @@
         ]
       }
     ],
-    "market_size": [],
-    "business_models": [],
+    "market_size": [
+      {
+        "text": "Smart garden and plant-sensor products are a niche inside consumer IoT; most units sell as low-cost add-ons.",
+        "fact_ids": [
+          "f1"
+        ]
+      },
+      {
+        "text": "Houseplant communities are large and active, which gives a cheap first audience to test with.",
+        "fact_ids": [
+          "f2"
+        ]
+      }
+    ],
+    "business_models": [
+      {
+        "text": "Sell a DIY kit (sensor plus board) to makers and classrooms.",
+        "fact_ids": [
+          "f1"
+        ]
+      },
+      {
+        "text": "Gallery or installation pieces, priced per commission rather than per unit.",
+        "fact_ids": [
+          "f3"
+        ]
+      }
+    ],
     "risks": [
       {
         "text": "Hardware cost and shipping make a small production run expensive.",

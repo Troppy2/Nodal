@@ -31,9 +31,9 @@ Not checked in the browser (sign-in creates a real account on hosted Supabase): 
 ## 3. Seen in the browser
 
 - **People graph highlight is meaningless.** All 24 projects have 3–10 cycles and most hit the 40-node cap. With 100 seeded profiles, the planned single ring "lighting up on cue" stands out from nothing.
-- **Mismatched match reason.** Soil Choir results: Rin is shown filling "Generative art", but the detail panel says "Matches need: Sound design".
+- ~~**Mismatched match reason.**~~ Fixed in `graph.py`. Soil Choir results: Rin is shown filling "Generative art", but the detail panel says "Matches need: Sound design".
 - **Test data in demo data:** Mobile game, Mobile game 2, Mobile game 3, two "Scraps" ideas, "efficient miner".
-- **Sample market report** (`backend/fixtures/research_report.json`) has empty `market_size` and `business_models`, so those sections never show.
+- ~~**Sample market report**~~ Fixed. (`backend/fixtures/research_report.json`) has empty `market_size` and `business_models`, so those sections never show.
 
 ## 4. Docs out of date
 
