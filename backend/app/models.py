@@ -107,6 +107,20 @@ class ProjectList(BaseModel):
     next_page: int | None = None
 
 
+class MyProjectMembership(BaseModel):
+    role: Literal["owner", "contributor"]
+    status: Literal["invited", "joined"]
+    skill: Skill | None = None
+    share_bps: int | None = None
+
+
+class MyProjectsOut(BaseModel):
+    owned: list[ProjectCard]
+    contributing: list[ProjectCard]
+    all: list[ProjectCard]
+    memberships: dict[str, MyProjectMembership] = {}
+
+
 class NeedIn(BaseModel):
     skill_id: int
     note: str | None = None

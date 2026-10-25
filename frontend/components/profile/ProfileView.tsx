@@ -108,7 +108,7 @@ function Profile({ handle }: { handle: string }) {
   ) : (
     <>
       <FollowButton profile={p} mutate={profile.mutate} />
-      <Link href={`/inbox?thread=m:${p.profile.id}`} className={btn.secondary}>
+      <Link href={`/messages?thread=m:${p.profile.id}`} className={btn.secondary}>
         <MessageCircle className="size-4" /> Message
       </Link>
     </>
@@ -435,8 +435,8 @@ function Cycles() {
             return (
               <li key={c.id}>
                 <Link
-                  href="/inbox"
-                  aria-label={`Open the ${c.kind} with ${others.join(" and ")} in your inbox`}
+                  href="/requests"
+                  aria-label={`Open the ${c.kind} with ${others.join(" and ")} in your requests`}
                   className="group -mx-3 flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-sunken focus-visible:outline-offset-[-3px]"
                 >
                   <span className="w-10 shrink-0 text-xs font-semibold text-teal">{c.kind === "swap" ? "Swap" : "Ring"}</span>

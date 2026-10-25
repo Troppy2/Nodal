@@ -316,3 +316,18 @@ export interface CustomSwapIn {
   their_skill_id: number;
   message?: string | null;
 }
+
+
+export interface MyProjectMembership {
+  role: "owner" | "contributor";
+  status: "invited" | "joined";
+  skill?: Skill | null;
+  share_bps?: number | null;
+}
+
+export interface MyProjectsOut {
+  owned: ProjectCard[];
+  contributing: ProjectCard[];
+  all: ProjectCard[];
+  memberships: Record<string, MyProjectMembership>;
+}
