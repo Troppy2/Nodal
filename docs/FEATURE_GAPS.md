@@ -9,9 +9,9 @@ Not checked in the browser (sign-in creates a real account on hosted Supabase): 
 | Feature | Backend | UI | Note |
 |---|---|---|---|
 | Source zip upload / delete | `POST`/`DELETE /projects/{id}/source` | No upload component | Owners can't add code. Buoy Watch and Park&Go show an "Open source" badge with 0 files and no Code tab. |
-| Intersections feed | `GET /feed/intersections` returns data | Never called | Demo script step 7 depends on it. |
+| ~~Intersections feed~~ (fixed: Intersections tab) | `GET /feed/intersections` returns data | Never called | Demo script step 7 depends on it. |
 | Idea suggestions (LLM) | 4 `/me/idea-suggestions` endpoints | None | No "Generate ideas" screen. |
-| Help wanted for you | `GET /me/matches` | Never called | The "projects that need me" direction has no screen. |
+| ~~Help wanted for you~~ (fixed: Needs you tab) | `GET /me/matches` | Never called | The "projects that need me" direction has no screen. |
 | Hide a recommendation | `POST /me/recommendations/{id}/dismiss` | No "Not interested" button | For you reads `/feed`; `/me/recommendations` is unused. |
 | "Needs you" Explore filter | Spec only | Missing | A "Shipped" chip is in its place. |
 

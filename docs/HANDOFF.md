@@ -149,3 +149,4 @@ There are 49 backend tests. They create real Supabase users and clean up after t
 - Backend spec: [`BACKEND.md`](BACKEND.md)
 - Frontend spec: [`FRONTEND.md`](FRONTEND.md)
 - Env sync issue: [#5](https://github.com/Troppy2/Nodal/issues/5)
+- 2026-10-24: Feed gains **Needs you** (`/me/matches`) and **Intersections** (`/feed/intersections`) tabs (`frontend/components/feed/Intersections.tsx`, `FeedTabs.tsx`). Intersections endpoint now dedupes A/B pairs and returns `other: ProjectCard`. tsc + eslint clean; checked in browser as maya.
