@@ -84,6 +84,7 @@ class Intersection(BaseModel):
     shared_tags: list[str]
     other_type: ProjectType
     other_project_id: str
+    other: ProjectCard
 
 
 @router.get("/feed/intersections", response_model=list[Intersection])
@@ -104,7 +105,15 @@ def intersections(user: dict | None = Depends(get_optional_user)):
             shared = w.tags[a] & w.tags[b]
             if a not in best or len(shared) > len(best[a][0]):
                 best[a] = (shared, b)
-    order = sorted(w.newest_first(best), key=lambda p: -len(best[p][0]))[:INTERSECTIONS]
-    built = {c["id"]: c for c in cards(w, order, user["id"] if user else None)}
+    # A <-> B and B <-> A are the same intersection: keep the first of each pair.
+    order, paired = [], set()
+    for p in sorted(w.newest_first(best), key=lambda p: -len(best[p][0])):
+        pair = frozenset((p, best[p][1]))
+        if pair not in paired:
+            paired.add(pair)
+            order.append(p)
+    order = order[:INTERSECTIONS]
+    built = {c["id"]: c for c in cards(w, order + [best[p][1] for p in order], user["id"] if user else None)}
     return [{"project": built[p], "shared_tags": sorted(best[p][0]), "other_type": w.projects[best[p][1]]["type"],
-             "other_project_id": best[p][1]} for p in order if p in built]
+             "other_project_id": best[p][1], "other": built[best[p][1]]}
+            for p in order if p in built and best[p][1] in built]

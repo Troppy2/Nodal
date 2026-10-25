@@ -11,9 +11,11 @@ import type { FeedResponse, ProjectCard } from "@/lib/api-types";
 import { useSession } from "@/lib/session";
 import { btn } from "@/lib/styles";
 import { useApi } from "@/lib/use-api";
+import { IntersectionList, NeedsYouList } from "./Intersections";
 import { PostCard, PostCardSkeleton } from "./PostCard";
 
 type Tab = "for_you" | "following" | "ideas";
+type AnyTab = Tab | "needs_you" | "intersections";
 
 const empty: Record<Tab, { text: string; action: React.ReactNode }> = {
   for_you: {
@@ -99,7 +101,7 @@ function FeedList({ tab }: { tab: Tab }) {
 }
 
 export function FeedTabs() {
-  const [tab, setTab] = useState<Tab>("for_you");
+  const [tab, setTab] = useState<AnyTab>("for_you");
   const { ready, signedIn } = useSession();
 
   const guest = ready && !signedIn;
@@ -111,14 +113,18 @@ export function FeedTabs() {
         tabs={[
           { id: "for_you", label: "For you" },
           { id: "following", label: "Following" },
+          { id: "needs_you", label: "Needs you" },
+          { id: "intersections", label: "Intersections" },
           { id: "ideas", label: "Ideas" },
         ]}
-        className="px-4 max-lg:[&>button]:flex-1 lg:gap-7 lg:px-0"
+        className="gap-5 px-4 lg:gap-7 lg:px-0"
       />
       {!ready ? (
         <div className="px-4 pt-3 lg:px-0 lg:pt-4">
           <PostCardSkeleton />
         </div>
+      ) : tab === "intersections" ? (
+        <IntersectionList />
       ) : guest ? (
         <div className="px-4 pt-3 lg:px-0 lg:pt-4">
           <EmptyState
@@ -138,6 +144,8 @@ export function FeedTabs() {
               : "Sign in with your name to post, follow people, and get matched with the projects that need you."}
           </EmptyState>
         </div>
+      ) : tab === "needs_you" ? (
+        <NeedsYouList />
       ) : (
         <FeedList key={`${tab}-${signedIn}`} tab={tab} />
       )}
