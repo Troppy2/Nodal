@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..db import service_client, user_client
+from ..deps import get_current_user
 from ..models import CommentIn, CommentOut
 from ..ratelimit import rate_limit
 from ..services.cards import profile_lite
