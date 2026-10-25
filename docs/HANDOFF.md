@@ -1,213 +1,151 @@
-# Nodal — Developer & Team Handoff Document
+# Handoff — Nodal
 
-**Document Version:** 1.0.0  
-**Repository Branch:** `main`  
-**Last Updated:** October 2026  
-**Status:** Feature Complete, Verified & Production-Ready  
+**Date:** 2026-10-24 · **Branch:** `main` · **State:** working hackathon build, not deployed
 
----
+Nodal is a social app for finding collaborators: post an idea or project with the skills it needs, get matched both ways, spot swaps and 3-way rings, invite people over DM, and fund bounties in **Tolken** (an in-app currency — there is no real money).
 
-## 1. Executive Summary
+This document is the handoff for whoever picks the repo up next. The specs remain the source of truth: [`DESIGN.md`](DESIGN.md), [`BACKEND.md`](BACKEND.md), [`FRONTEND.md`](FRONTEND.md), and the run guide [`RUNNING.md`](RUNNING.md). A separate audit of what is built versus exposed in the UI is in [`FEATURE_GAPS.md`](FEATURE_GAPS.md).
 
-**Nodal** is a collaborative ecosystem designed to connect founders, developers, designers, and creatives through skill-matched projects, AI-powered feasibility checks, two-way and multi-party resource swaps (Rings), and an escrowed bounty economy (Tolken).
+## 1. Where things stand
 
-Over recent sprints, the platform was elevated from a prototype into a fully interactive platform with closed-loop workflows for all major lifecycle actions: project management, collaboration requests, work submission and escrowed bounty release, image uploads, notifications, custom swaps, and UX polish (zero unwanted scrollbars, multi-port CORS compatibility).
+- **All branches are merged into `main`** (`claude/project-thread-0ibtsj`, `claude/project-thread-q0nqcw`, `docs/spec`). No branch is ahead of `main`.
+- **Backend is real**, not mocked: FastAPI on Supabase Postgres/Auth/Storage, with 59 endpoints, versioned migrations, and a seeded demo world.
+- **Frontend is wired to that API** end to end: landing, onboarding, feed, explore, create, project/results/team, inbox with DMs, profile, notifications, image uploads.
+- **Not deployed.** There is no Dockerfile, Render/Railway/Vercel config, or CI workflow. It runs locally (or with hosted Supabase) as described in `RUNNING.md`.
+- **Verification:** frontend `tsc`, `eslint`, and `next build` are clean. Backend tests (49) pass individually; a full run against hosted Supabase is flaky (network/rate limits). Use the local Supabase stack for a reliable suite (see §8).
 
----
+## 2. Stack and architecture
 
-## 2. System Architecture
+| Piece | Detail |
+| --- | --- |
+| Frontend | Next.js 15.5.28 (App Router), React 19, Tailwind v4, `@base-ui/react`, Lucide, Sonner |
+| Backend | FastAPI (Pydantic v2), Uvicorn, SlowAPI rate limiting, Supabase Python client |
+| Database / auth / storage | Supabase Postgres with RLS, Supabase Auth, public `images` bucket |
+| API port | `8010` in local dev (`/api/v1`, OpenAPI at `/docs`) |
+| Frontend port | `3000` by default; CORS accepts any localhost port |
+
+Backend shape worth knowing before editing:
+
+- `backend/app/world.py` builds an in-memory **cached world** (profiles, projects, needs, offers, stars, follows, members). `InvalidateOnWrite` middleware in `main.py` clears it after every POST/PATCH/PUT/DELETE, so reads stay fast and writes are immediately visible.
+- `backend/app/slugs.py` accepts `/projects/{slug}` as well as UUIDs.
+- Name-only sign-in (`POST /auth/name`) mints a real Supabase session; `NAME_SIGNIN_ENABLED=false` disables it. Anyone can sign in as anyone while it is on — fine for the demo only.
+- Tolken bounties live in `tolken_ledger`; funding/releasing moves balances through a service-role function.
+- Project invites and their follow-up are **messages** (`messages` table, kinds `invite` / `nudge`); the owner’s confirmation and the invitee’s DM are the same row.
+
+## 3. Repo map
 
 ```
-                    ┌───────────────────────────────────────────┐
-                    │           Next.js 15 (React 19)           │
-                    │        Tailwind CSS v4 + Lucide Icons     │
-                    │      Ports: 3000, 3001, 3002 (CORS OK)    │
-                    └─────────────────────┬─────────────────────┘
-                                          │ REST / JSON & FormData
-                                          ▼
-                    ┌───────────────────────────────────────────┐
-                    │              FastAPI Backend              │
-                    │         Uvicorn on port 8010              │
-                    │    Pydantic v2 + SlowApi Rate Limiter     │
-                    └──────────────┬─────────────┬──────────────┘
-                                   │             │
-                PostgREST / Auth   │             │ Public Storage Uploads
-                                   ▼             ▼
-  ┌──────────────────────────────────┐         ┌──────────────────────────────────┐
-  │         Supabase Postgres        │         │      Supabase Storage Bucket     │
-  │     (Tables, Constraints, Views) │         │             ("images")           │
-  └──────────────────────────────────┘         └──────────────────────────────────┘
+backend/app/
+  main.py               app wiring, CORS, cache invalidation
+  routers/              auth, projects, comments, collab, feed, graph, ideas,
+                        inbox, matches, me, messages, notifications, profiles,
+                        recommendations, research, skills, social, source,
+                        team, tolken, upload
+  services/             matching, graph/cycles, cards, research pipeline,
+                        source ingestion, Tolken, LLM/web research
+  world.py              cached read model
+backend/supabase/migrations/   schema, RLS, slugs, messages (apply in order)
+backend/scripts/seed.py        idempotent demo data (people, projects, rings, zips)
+backend/tests/                 integration tests against a real Supabase
+
+frontend/app/
+  page.tsx              signed-out landing (sign-in card + cover art)
+  feed/ explore/ create/ onboarding/
+  projects/[id]/{,results,team}/
+  inbox/ u/[handle]/ login/
+frontend/components/    shell, feed, project, inbox (requests + DMs), profile,
+                        people graph, onboarding, checks, forms, ui
+frontend/lib/           api client, session, types, hooks, styles
 ```
 
-### Technology Stack
-- **Frontend:** Next.js 15.1 (App Router), React 19, TypeScript, Tailwind CSS v4, `@base-ui/react`, `sonner`, `lucide-react`.
-- **Backend:** Python 3.12/3.14, FastAPI, Uvicorn, Supabase Python Client (PostgREST + Gotrue + Storage), SlowAPI.
-- **Database & Storage:** Hosted Supabase PostgreSQL instance with Supabase Storage public bucket `images`.
+## 4. Environment variables
 
----
+Backend `backend/.env` (names are exact; see `backend/.env.example`):
 
-## 3. Key Constraints & Database Invariants
-
-> **Important:**
-> **No Dashboard / Zero-Migration Policy:**
-> Database operations must strictly comply with the existing Postgres schema. No manual SQL migrations or dashboard interventions are required.
-
-### Critical Database Constraints:
-1. **`project_needs_status_check`:**
-   - Allowed values: `'open'` or `'filled'`.
-   - Any attempt to insert or update `status = 'claimed'` or other custom statuses triggers a database check violation error (`code 23514`).
-   - *Architecture Solution:* When a contributor submits work for review via `POST /projects/{id}/needs/{need_id}/submit-work`, the need remains `'open'`, while the review submission is recorded in `tolken_ledger` (linking `recipient_id` to the escrowed bounty) and an in-project notification comment is created. When the project owner accepts the work via `POST /projects/{id}/needs/{need_id}/confirm-work`, the need status is updated to `'filled'` and the Tolken bounty is released to the contributor.
-2. **Tolken Escrow Guarantee:**
-   - When a project with escrowed needs is deleted via `DELETE /projects/{id}`, any active unreleased bounties held in escrow are automatically refunded to the owner's balance before the project record is purged.
-
----
-
-## 4. Completed Workflows & Feature Inventory
-
-### 4.1. Work Submission & Bounty Completion (Begin -> End)
-1. **Bounty Need Creation:** An owner creates a need with a Tolken bounty; the Tolken amount is deducted and held in escrow (`status = 'open'`).
-2. **Work Submission:** Any logged-in member or contributor clicks **"Submit Work for Review"** on the bounty card.
-   - Endpoint: `POST /projects/{id}/needs/{need_id}/submit-work`
-   - Records contributor claim in `tolken_ledger` without violating the DB check constraint.
-   - Posts a visible notification comment on the project page.
-3. **Owner Review & Release:** The project owner sees **"Review & Release Bounty"**. Clicking it confirms completion.
-   - Endpoint: `POST /projects/{id}/needs/{need_id}/confirm-work`
-   - Transitions `project_needs.status` to `'filled'`.
-   - Releases the escrowed Tolken tokens to the contributor's account balance.
-   - Triggers an instant toast and balance update.
-
-### 4.2. Image Upload System (Profile, Projects & Ideas)
-- **Component:** `frontend/components/forms/ImageUploader.tsx`
-- **Endpoint:** `POST /api/v1/upload/image`
-  - Validates MIME types (PNG, JPEG, WebP, GIF, SVG) and enforces an 8MB size limit.
-  - Automatically stores files in Supabase Storage bucket `images` under a user-scoped directory (`images/{user_id}/{uuid}.{ext}`).
-  - Returns permanent public CDN URL.
-- **Surfaces:**
-  - **New Idea/Project Post (`frontend/components/forms/PostForm.tsx`):** Drag-and-drop or file upload for project/idea covers.
-  - **Edit Project (`frontend/components/project/ProjectView.tsx`):** Update or replace cover banner image.
-  - **Profile Avatar (`frontend/components/profile/ProfileView.tsx`):** Circular avatar upload with live preview and removal.
-  - **URL Fallback:** Supports pasting external URLs if the user prefers.
-
-### 4.3. In-Context Project Lifecycle & Deletions
-- **Edit Project / Idea:** Project owners can click the pencil icon next to the title to open `EditProjectDialog`, editing title, summary/caption, stage (`idea`, `building`, `shipped`), cover art, README markdown, repository URL, demo URL, and tags.
-  - Endpoint: `PATCH /projects/{id}`
-- **Delete Project / Idea:** Owners can safely delete projects via a double-confirmation modal. Escrowed bounties are returned to owner.
-  - Endpoint: `DELETE /projects/{id}`
-- **Delete Comments:** Comment authors and project owners can delete comments directly with trash button.
-  - Endpoint: `DELETE /projects/{id}/comments/{comment_id}`
-- **Edit & Delete Needs:** Owners can add, edit, or delete individual needs and bounties on the fly.
-  - Endpoints: `POST /projects/{id}/needs`, `PATCH /projects/{id}/needs/{need_id}`, `DELETE /projects/{id}/needs/{need_id}`
-
-### 4.4. "Shipped" Projects Section
-- Projects can be transitioned to `"shipped"` via the edit dialog or results view.
-- The Explore page (`frontend/components/explore/ExploreGrid.tsx`) features a dedicated **"Shipped"** filter tab, highlighting completed and launched builds.
-
-### 4.5. Collaboration & Team Management
-- **In-Context Requests:** Pending collaboration requests appear prominently in a callout banner on the project's Needs tab.
-- **Accept/Decline:** The owner can accept or decline contributors with one click.
-  - Endpoints: `GET /projects/{id}/collab-requests`, `POST /collab-requests/{id}/respond`
-- **Start Building Trigger:** On check results (`frontend/components/checks/ResultsView.tsx`), clicking **"Start building"** actively patches the stage from `idea` to `building` and navigates to the project workspace.
-
-### 4.6. Messaging & Direct Project Invites
-- When a user receives an invitation message (`"invite"`), the inbox (`frontend/components/inbox/Messages.tsx`) renders an interactive invitation card.
-- Clicking **"Accept Invite & Start Working"** calls `POST /messages/{id}/accept-invite`, adding the user to `project_members` and sending an automated confirmation message back to the thread.
-
-### 4.7. Notifications Hub
-- **Location:** In the Inbox page under the **"Alerts"** tab (`frontend/components/inbox/InboxView.tsx`).
-- **Endpoint:** `GET /me/notifications`
-- Aggregates:
-  - Stars on viewer's projects
-  - Comments on viewer's projects
-  - New profile followers
-  - Funded and released Tolken bounties
-
-### 4.8. Social Bounty Sharing
-- Every open bounty card includes a **"Share Bounty"** button.
-- Generates a deep link with query parameter `?bounty={need_id}`.
-- Visiting the deep link automatically selects the "Needs" tab, scrolls to the targeted bounty, and highlights it with a temporary pulse effect.
-
-### 4.9. Simplified Swaps & Custom 2-Way Swaps
-- **Ring Explainer:** Visual badge clarifying how collaborative skill swaps flow.
-- **Custom Swaps:** In the Inbox, users can propose a custom 2-way swap with any collaborator.
-  - Endpoint: `POST /cycles/custom-swap`
-
-### 4.10. Scrollbar & UI Polish
-- Unwanted horizontal and vertical scrollbars across Chrome, Edge, Safari, and Windows desktop were removed from:
-  - Tab navigation strips (`[role="tablist"]`, `[data-slot="tabs-list"]`)
-  - Filter button rows in Explore and Inbox
-  - Edit dialogs, modals, and popup overlays (`[role="dialog"]`, `[data-slot="dialog-content"]`)
-  - Multi-line textareas (README, Caption, Bio)
-- Scrolling behavior remains 100% functional via mouse wheel, trackpad, and touch.
-
----
-
-## 5. API Reference Summary
-
-| Method | Endpoint | Description | Auth Required |
-|---|---|---|---|
-| `POST` | `/api/v1/upload/image` | Upload local image (PNG, JPEG, WebP, GIF, SVG <= 8MB) | Yes |
-| `PATCH` | `/api/v1/projects/{id}` | Update title, caption, stage, cover, readme, tags, urls | Yes (Owner) |
-| `DELETE` | `/api/v1/projects/{id}` | Delete project & refund escrowed bounties | Yes (Owner) |
-| `POST` | `/api/v1/projects/{id}/needs/{need_id}/submit-work` | Submit work for bounty review | Yes |
-| `POST` | `/api/v1/projects/{id}/needs/{need_id}/confirm-work` | Confirm work & release Tolken bounty | Yes (Owner) |
-| `PATCH` | `/api/v1/projects/{id}/needs/{need_id}` | Edit note or bounty amount | Yes (Owner) |
-| `DELETE` | `/api/v1/projects/{id}/needs/{need_id}` | Remove need | Yes (Owner) |
-| `GET` | `/api/v1/projects/{id}/collab-requests` | List collab requests for project | Yes (Owner) |
-| `POST` | `/api/v1/collab-requests/{id}/respond` | Accept or decline collab request | Yes (Owner) |
-| `DELETE` | `/api/v1/projects/{id}/comments/{comment_id}` | Delete comment | Yes (Author/Owner) |
-| `POST` | `/api/v1/messages/{id}/accept-invite` | Accept project invite from direct message | Yes |
-| `GET` | `/api/v1/me/notifications` | Aggregate activity alerts | Yes |
-| `POST` | `/api/v1/cycles/custom-swap` | Propose custom 2-way skill swap | Yes |
-
----
-
-## 6. Local Setup & Running Guide
-
-### 6.1. Environment Configuration
-
-#### Backend (`backend/.env`):
-```env
-SUPABASE_URL=https://bcjrztgtveramgvekhwu.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=<service_role_key>
-SUPABASE_ANON_KEY=<anon_key>
-TOLKEN_STARTING_BALANCE=100
+```dotenv
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_KEY=
+SUPABASE_JWT_SECRET=        # empty unless the project signs legacy HS256 tokens
+FRONTEND_ORIGIN=http://localhost:3000
+NAME_SIGNIN_ENABLED=true
+RESEARCH_MODE=fixture       # live needs LLM_* and TINYFISH_API_KEY
 ```
 
-#### Frontend (`frontend/.env.local`):
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://bcjrztgtveramgvekhwu.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon_key>
+Frontend `frontend/.env.local`:
+
+```dotenv
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
 NEXT_PUBLIC_API_URL=http://localhost:8010/api/v1
 ```
 
-### 6.2. Starting the Servers
+Only the **anon** key may reach the browser. The frontend values are still copied from the backend by hand — issue [#5](https://github.com/Troppy2/Nodal/issues/5) covers generating them so they cannot drift.
 
-#### Backend (FastAPI on Port 8010):
-```powershell
-cd backend
-.\.venv\Scripts\Activate.ps1
-uvicorn app.main:app --port 8010 --reload
+## 5. Running it
+
+Full instructions, ports, seeding, hosted-Supabase setup, and troubleshooting are in [`RUNNING.md`](RUNNING.md). Short version:
+
+```bash
+# backend/
+npx supabase start
+python -m venv .venv && .venv\Scripts\activate
+pip install -r requirements.txt
+python -m scripts.seed
+uvicorn app.main:app --reload --port 8010
+
+# frontend/
+npm install && npm run dev
 ```
 
-#### Frontend (Next.js on Port 3000 / 3002):
-```powershell
-cd frontend
-npm run dev
+Open `http://localhost:3000`, sign in with a name, finish onboarding. Seeded people (`maya`, `rin`, `dev`, `sam`, …) sign in by name and land on populated data.
+
+## 6. What works today
+
+- **Landing + auth:** landing page, name-only sign-in, onboarding (skills, interests, follows).
+- **Feed:** For you / Following / Ideas, composer, story row of swaps/rings, infinite “load more”, sidebar that collapses to icons.
+- **Projects:** create/edit/delete, covers and avatars via image upload, needs, comments, source browsing, star/follow, team shares, Tolken bounty fund/release/submit/confirm, stage changes.
+- **Matching:** ranked matches both directions, project people graph, swap and ring detection, inbox invite flow.
+- **Ideas:** market check and cool factor (fixture or live research), public report toggle.
+- **Inbox:** requests, sent, Alerts (notifications), Messages (DMs, invites, nudges), custom 2-way swaps.
+- **Profile:** offers/interests editing, contribution graph, projects/ideas/starred, Tolken history, DM entry point.
+- **Explore:** search and filters (the “Shipped” chip has replaced the spec’s “Needs you”).
+
+## 7. Known gaps and risks
+
+Detailed list: [`FEATURE_GAPS.md`](FEATURE_GAPS.md). The ones to know before a demo:
+
+1. **Backend-only features with no screen:** source zip upload/delete, intersections feed, idea suggestions, `/me/matches` (“projects that need me”), recommendation dismiss.
+2. **Bounty submit/confirm is permissive:** `submit-work` has no membership check, and `confirm-work` funds/releases inside `try/except: pass` — a failed release marks the need filled without moving Tolken. Project/need deletion has the same silent-refund pattern.
+3. **Notifications** are a second path (their own endpoint/table reads), which contradicts the “invites are DMs” rule in `CLAUDE.md`; unused `collab`/`invite` kinds are declared.
+4. **Uploads** create the `images` bucket at runtime and accept any `image/*`, including SVG. That is convenient for a hackathon, not a hardened upload path.
+5. **Seed noise:** 100 generated profiles with names like “Mobile game 2” dilute the graph; the “one ring lights up” demo moment is weaker than intended.
+6. **Docs drift:** some spec pages still describe GitHub/magic-link auth, React Flow/TanStack Query, and old routes.
+7. **No deployment or CI**; no production hardening (rate limits are in-process, name-only auth is unsafe, no backups).
+
+## 8. Tests
+
+```bash
+cd backend && .venv\Scripts\activate && pytest        # integration, needs Supabase + seed
+cd frontend && npx tsc --noEmit && npm run lint && npm run build
 ```
 
-> **Note:**
-> The backend CORS configuration allows `http://localhost:3000`, `3001`, `3002`, `3003`, and matches any localhost/127.0.0.1 port via regex. Sign-in and API calls work seamlessly regardless of which local port Next.js binds to.
+There are 49 backend tests. They create real Supabase users and clean up after themselves. Against **hosted** Supabase the whole suite can fail on network/rate-limit hiccups while passing when rerun; run against local Supabase (`npx supabase start`) when you need a trustworthy result. Add tests for the newer endpoints (`upload/image`, `submit-work`/`confirm-work`, custom swaps, notifications, project/comment deletes) — they have none yet.
 
-### 6.3. Running Verification Checks
-- **TypeScript:** `npm --prefix frontend run build` (or `npx tsc --noEmit`) -> 0 errors.
-- **ESLint:** `npm --prefix frontend run lint` -> 0 errors.
-- **Python Syntax:** `python -m py_compile backend/app/main.py backend/app/routers/*.py` -> 0 errors.
+## 9. Suggested next steps
 
----
+1. Close the silent-failure holes in bounty submit/confirm and refunds; add a membership check and surface errors instead of swallowing them.
+2. Add the missing UIs that the demo depends on: source upload, intersections, “projects that need me”.
+3. Generate frontend env from the backend (issue #5) and add CI that runs `tsc`, `lint`, `build`, and `pytest`.
+4. Trim or curate seed data so the swap/ring graph reads clearly on stage.
+5. Harden before any public deployment: turn off name-only sign-in, restrict uploads (MIME allow-list without SVG), move rate limiting off-process, add deploy configs.
+6. Reconcile `BACKEND.md` / `FRONTEND.md` with the implemented API and routes.
 
-## 7. Recommended Next Steps / Roadmap
+## 10. Useful links
 
-1. **Email / Push Notifications:** Currently notifications are in-app via `GET /me/notifications`. Connecting Resend or WebPush could alert users when offline.
-2. **Tolken Micro-Tipping:** Allow users to tip Tolkens directly on insightful comments or projects outside formal bounties.
-3. **Multi-File Image Carousel:** Extend `ImageUploader` to support multi-image galleries on project READMEs and showcase tabs.
-4. **Automated CI/CD:** Add GitHub Actions workflow executing `npx tsc --noEmit` and `pytest` on push to `main`.
+- Run guide: [`RUNNING.md`](RUNNING.md)
+- Gap audit: [`FEATURE_GAPS.md`](FEATURE_GAPS.md)
+- Product/design: [`DESIGN.md`](DESIGN.md)
+- Backend spec: [`BACKEND.md`](BACKEND.md)
+- Frontend spec: [`FRONTEND.md`](FRONTEND.md)
+- Env sync issue: [#5](https://github.com/Troppy2/Nodal/issues/5)
