@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { Award, Bell, Check, ChevronLeft, Loader2, MessageSquare, Star, UserPlus, X } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Award, Bell, Check, ChevronLeft, MessageSquare, Star, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar } from "@/components/Avatar";
-import { EmptyState, ErrorState, RowsSkeleton } from "@/components/checks/States";
+import { EmptyState, ErrorState, RowsSkeleton, firstName } from "@/components/checks/States";
 import { api } from "@/lib/api";
 import type { CollabOut, ConversationOut, Cycle, InboxItem, NotificationItem, ProfileLite } from "@/lib/api-types";
 import { useSession } from "@/lib/session";
@@ -233,50 +232,47 @@ function CollabCard({
   );
 }
 
+/** One side of a trade from the viewer's seat: what you give (and to whom), or what you get (and from whom). */
+function Trade({ dir, skill, who }: { dir: "give" | "get"; skill: string; who: string }) {
+  return (
+    <p className="text-[13px] leading-snug text-muted-ink">
+      <span className={cn("font-semibold", dir === "give" ? "text-ink" : "text-teal")}>{dir === "give" ? "You give" : "You get"}</span>{" "}
+      {skill} {dir === "give" ? "to" : "from"} {who}
+    </p>
+  );
+}
+
+/**
+ * Trades Nodal found on the skill graph. A swap is two people filling each other's needs; a ring is
+ * three, each helping the next, so nobody has to help back the person who helps them.
+ */
 function CycleSuggestions({
   cycles,
   items,
   meId,
   onInvited,
-  onProposeCustom,
 }: {
   cycles: Cycle[];
   items: InboxItem[];
   meId: string;
   onInvited: (item: InboxItem) => void;
-  onProposeCustom?: () => void;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const key = (ids: string[]) => [...ids].sort().join(",");
   const started = new Set(
     items.filter((i) => i.kind !== "collab" && i.status !== "declined").map((i) => `${i.kind}:${key(Object.keys(i.responses))}`),
   );
-  const open = cycles.filter((c) => !started.has(`${c.kind}:${key(c.members.map((m) => m.id))}`));
-  if (open.length === 0) {
-    return (
-      <section aria-labelledby="start-title" className="border-t border-line px-5 py-4">
-        <div className="flex items-center justify-between gap-2">
-          <h2 id="start-title" className="text-[13px] font-semibold text-muted-ink">
-            Skill Swaps
-          </h2>
-          <button
-            type="button"
-            onClick={onProposeCustom}
-            className="text-xs font-semibold text-teal hover:underline"
-          >
-            + Propose custom swap
-          </button>
-        </div>
-        <p className="mt-1 text-xs text-muted-ink">Trade skills with another creator with 0 Tolken spent.</p>
-      </section>
-    );
-  }
+  // Swaps first: they are the simpler trade to explain and to accept.
+  const open = cycles
+    .filter((c) => !started.has(`${c.kind}:${key(c.members.map((m) => m.id))}`))
+    .sort((a, b) => Number(a.kind === "ring") - Number(b.kind === "ring"));
+  if (open.length === 0) return null;
 
   async function invite(c: Cycle) {
     setBusy(c.id);
     try {
       const item = await api<InboxItem>("/cycles/invite", { method: "POST", body: { cycle_id: c.id } });
-      toast.success(c.kind === "swap" ? "Swap invite sent" : "Ring invite sent");
+      toast.success(c.kind === "swap" ? "Swap proposed" : "Ring proposed");
       onInvited(item);
     } catch (e) {
       toast.error((e as Error).message);
@@ -285,137 +281,40 @@ function CycleSuggestions({
     }
   }
 
+  const nameOf = (c: Cycle, id: string) => firstName(c.members.find((m) => m.id === id) ?? { handle: "someone", display_name: null });
+
   return (
     <section aria-labelledby="start-title" className="border-t border-line px-5 py-4">
-      <div className="flex items-center justify-between gap-2">
-        <h2 id="start-title" className="text-[13px] font-semibold text-muted-ink">
-          Swaps and rings
-        </h2>
-        <button
-          type="button"
-          onClick={onProposeCustom}
-          className="text-xs font-semibold text-teal hover:underline"
-        >
-          + Custom swap
-        </button>
-      </div>
-      <ul className="mt-2 flex flex-col">
-        {open.slice(0, 5).map((c) => {
+      <h2 id="start-title" className="text-[13px] font-semibold text-muted-ink">
+        Trades for you
+      </h2>
+      <p className="mt-1 text-xs leading-relaxed text-muted-ink">
+        <span className="font-semibold text-ink">Swap:</span> you and one person fill each other&apos;s needs.{" "}
+        <span className="font-semibold text-ink">Ring:</span> three people, each helps the next. No Tolken changes hands.
+      </p>
+      <ul className="mt-2 flex flex-col divide-y divide-line">
+        {open.slice(0, 4).map((c) => {
           const others = c.members.filter((m) => m.id !== meId);
-          const mine = c.links.find((l) => l.from === meId);
+          const give = c.links.find((l) => l.from === meId);
+          const get = c.links.find((l) => l.to === meId);
           return (
-            <li key={c.id} className="flex items-center gap-3 py-2">
+            <li key={c.id} className="flex items-center gap-3 py-2.5">
               <Faces people={others} size={36} />
               <div className="min-w-0 flex-1 leading-snug">
                 <p className="truncate text-sm font-semibold">
-                  {c.kind === "swap" ? "Swap" : "Ring"} with {joinNames(others.map(displayName))}
+                  {c.kind === "swap" ? "Swap" : "Ring"} with {joinNames(others.map(firstName))}
                 </p>
-                {mine && <p className="truncate text-[13px] text-muted-ink">You do {mine.skill.name} for {mine.project_title}</p>}
+                {give && <Trade dir="give" skill={give.skill.name} who={nameOf(c, give.to)} />}
+                {get && <Trade dir="get" skill={get.skill.name} who={nameOf(c, get.from)} />}
               </div>
               <button disabled={busy === c.id} onClick={() => invite(c)} className={cn(btn.match, "h-9 px-3")}>
-                Invite
+                Propose
               </button>
             </li>
           );
         })}
       </ul>
     </section>
-  );
-}
-
-/** Requests in one place: join requests, swap invites, and ring invites. List and detail on desktop; one at a time on mobile. */
-
-function CustomSwapDialog({
-  open,
-  onClose,
-  onCreated,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onCreated: (item: InboxItem) => void;
-}) {
-  const [partnerHandle, setPartnerHandle] = useState("");
-  const [myProjectId, setMyProjectId] = useState("");
-  const [theirProjectId, setTheirProjectId] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!partnerHandle.trim() || !myProjectId.trim() || !theirProjectId.trim()) return;
-    setSubmitting(true);
-    try {
-      // Find partner profile by handle
-      const partner = await api<{ profile: ProfileLite }>(`/profiles/${partnerHandle.trim().replace(/^@/, "")}`);
-      const item = await api<InboxItem>("/cycles/custom-swap", {
-        method: "POST",
-        body: {
-          partner_id: partner.profile.id,
-          my_project_id: myProjectId.trim(),
-          my_skill_id: 1,
-          their_project_id: theirProjectId.trim(),
-          their_skill_id: 1,
-        },
-      });
-      toast.success("Swap proposal sent! Partner notified in their inbox.");
-      onCreated(item);
-      onClose();
-    } catch (err) {
-      toast.error((err as Error).message);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogTitle>Propose a skill swap</DialogTitle>
-        <DialogDescription>
-          Agree to help each other&apos;s project with 0 Tolken exchanged. When both accept, you both join each other&apos;s team.
-        </DialogDescription>
-        <form onSubmit={submit} className="mt-4 flex flex-col gap-3.5">
-          <div>
-            <label className="block text-xs font-semibold mb-1">Partner Handle</label>
-            <input
-              value={partnerHandle}
-              onChange={(e) => setPartnerHandle(e.target.value)}
-              placeholder="e.g. alex or sarah"
-              className="h-10 w-full rounded-lg border border-line px-3 text-sm outline-none focus:border-ink"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold mb-1">Your Project ID / Slug</label>
-            <input
-              value={myProjectId}
-              onChange={(e) => setMyProjectId(e.target.value)}
-              placeholder="Your project ID that needs their help"
-              className="h-10 w-full rounded-lg border border-line px-3 text-sm outline-none focus:border-ink"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold mb-1">Their Project ID / Slug</label>
-            <input
-              value={theirProjectId}
-              onChange={(e) => setTheirProjectId(e.target.value)}
-              placeholder="Their project ID you want to help"
-              className="h-10 w-full rounded-lg border border-line px-3 text-sm outline-none focus:border-ink"
-              required
-            />
-          </div>
-          <div className="flex justify-end gap-2 border-t border-line pt-3 mt-1">
-            <button type="button" onClick={onClose} className={btn.secondary}>
-              Cancel
-            </button>
-            <button type="submit" disabled={submitting} className={btn.primary}>
-              {submitting && <Loader2 className="size-4 animate-spin mr-1.5" />}
-              Send swap proposal
-            </button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -428,7 +327,6 @@ export function InboxView() {
   const cycles = useApi<Cycle[]>(signedIn ? "/me/cycles" : null);
   const conversations = useApi<ConversationOut[]>(signedIn ? "/me/conversations" : null);
   const notifications = useApi<NotificationItem[]>(signedIn ? "/me/notifications" : null);
-  const [proposingSwap, setProposingSwap] = useState(false);
   const [filter, setFilter] = useState<Filter>("requests");
   const [busy, setBusy] = useState(false);
   const selectedId = params.get("thread");
@@ -524,17 +422,6 @@ export function InboxView() {
 
   return (
     <>
-      {proposingSwap && (
-        <CustomSwapDialog
-          open={proposingSwap}
-          onClose={() => setProposingSwap(false)}
-          onCreated={(item) => {
-            inbox.mutate((prev) => [item, ...(prev ?? [])]);
-            setFilter("sent");
-            select(item.id);
-          }}
-        />
-      )}
       <div className="lg:grid lg:h-dvh lg:grid-cols-[380px_minmax(0,1fr)] lg:overflow-hidden">
       <aside
         className={cn(
@@ -638,7 +525,6 @@ export function InboxView() {
                 setFilter("sent");
                 select(item.id);
               }}
-              onProposeCustom={() => setProposingSwap(true)}
             />
           )}
         </div>

@@ -37,12 +37,12 @@ export function RingInviteCard({
     <div className="focus-inset overflow-hidden rounded-xl border border-line">
       <div className="bg-teal-tint/30 border-b border-teal/20 px-4 py-2.5 text-xs text-ink/80 flex items-start gap-2">
         <span className="font-bold text-teal shrink-0">
-          {item.kind === "swap" ? "Skill Swap:" : "3-way Ring:"}
+          {item.kind === "swap" ? "Swap:" : "Ring:"}
         </span>
         <span>
           {item.kind === "swap"
-            ? "Both creators help each other's project with 0 Tolken spent. When both accept, you each join the other's team."
-            : "A 3-creator collaboration circle where everyone gives and gets help with 0 Tolken spent."}
+            ? "You and one person fill each other's needs. When both accept, you each join the other's team. No Tolken changes hands."
+            : "Three people, each helps the next. When all three accept, everyone joins the team they help. No Tolken changes hands."}
         </span>
       </div>
       <ul className="divide-y divide-line">
