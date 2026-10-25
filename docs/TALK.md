@@ -11,6 +11,7 @@ Scoring numbers come from `backend/app/services/matching.py`.
 
 ## 1. Introduction, problem, and the prompt (~45 s)
 
+- **Hook (slide 2):** "Let's be honest: the job market is f*****." Pause. "So stop waiting to be hired. Find the people who need your skills, and build with them."
 - **Who:** "I'm Inah James, and this is Nodal."
 - **Problem 1:** you can't find people with the skills your project is missing.
 - **Problem 2:** you don't know if the idea is worth building.
