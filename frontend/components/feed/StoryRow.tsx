@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Plus } from "lucide-react";
 import { Avatar } from "@/components/Avatar";
 import { Label } from "@/components/Meta";
 import type { Story } from "@/lib/api-types";
@@ -35,16 +34,6 @@ export function StoryRow() {
       </header>
 
       <div className="flex gap-1 overflow-x-auto px-2 pb-3 pt-2 [scrollbar-width:none]">
-        <Link
-          href="/create"
-          className="group flex w-[76px] shrink-0 flex-col items-center gap-1.5 rounded-lg px-1 py-1 transition-colors hover:bg-sunken"
-        >
-          <span className="flex size-[52px] items-center justify-center rounded-full border-2 border-dashed border-muted-ink/40 text-muted-ink transition-colors group-hover:border-ink group-hover:text-ink">
-            <Plus className="size-5" strokeWidth={2} />
-          </span>
-          <span className="text-xs font-medium">New post</span>
-        </Link>
-
         {loading &&
           !data &&
           Array.from({ length: 4 }, (_, i) => (
